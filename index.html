@@ -488,7 +488,7 @@ function App(){
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:24,flexWrap:'wrap'}}>
             <span style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu}}>RANGE</span>
             <div style={{display:'flex',border:`2px solid ${t.b}`}}>
-              {[['24h','24H'],['7d','7D'],['30d','30D'],...(useRealHist?[['90d','90D']]:[]],['all','ALL']].map(([val,lbl],i)=>(
+              {[['24h','24H'],['7d','7D'],['30d','30D'],...(useRealHist?[['90d','90D']]:[]),['all','ALL']].map(([val,lbl],i)=>(
                 <button key={val} onClick={()=>setHRange(val)} style={{...pb(hRange===val),border:'none',borderLeft:i>0?`2px solid ${t.b}`:'none',boxShadow:'none'}}>{lbl}</button>
               ))}
             </div>
@@ -561,15 +561,7 @@ function App(){
 
 // ── Last.fm Dashboard ─────────────────────────────────────────────────────────
 function LastfmView({user,recent,tops,period,onPeriod,subView,setSubView,t,pb,dark,notConnected,onConnect}){
-  if(notConnected)return(
-    <div style={{border:`2px solid ${t.b}`,padding:'60px 0',textAlign:'center'}}>
-      <div style={{fontSize:32,marginBottom:12}}>◉</div>
-      <div style={{fontWeight:900,letterSpacing:2,marginBottom:8}}>LAST.FM NOT CONNECTED</div>
-      <div style={{color:t.mu,fontSize:12,marginBottom:20}}>Connect your Last.fm account to see your full listening stats.</div>
-      <button onClick={onConnect} style={{background:LFM_COLOR,border:`2px solid ${LFM_COLOR}`,color:'#fff',fontWeight:900,fontSize:12,letterSpacing:2,padding:'10px 20px',cursor:'pointer',fontFamily:'inherit'}}>CONNECT LAST.FM</button>
-    </div>
-  );
-
+  // hooks must run unconditionally — before any early return
   const curTops=tops[period]||{tracks:[],artists:[],albums:[]};
 
   const playsPerDay=useMemo(()=>{
@@ -578,6 +570,15 @@ function LastfmView({user,recent,tops,period,onPeriod,subView,setSubView,t,pb,da
     return last30.map(day=>({day,count:counts[day]||0}));
   },[recent]);
   const maxD=Math.max(...playsPerDay.map(d=>d.count),1);
+
+  if(notConnected)return(
+    <div style={{border:`2px solid ${t.b}`,padding:'60px 0',textAlign:'center'}}>
+      <div style={{fontSize:32,marginBottom:12}}>◉</div>
+      <div style={{fontWeight:900,letterSpacing:2,marginBottom:8}}>LAST.FM NOT CONNECTED</div>
+      <div style={{color:t.mu,fontSize:12,marginBottom:20}}>Connect your Last.fm account to see your full listening stats.</div>
+      <button onClick={onConnect} style={{background:LFM_COLOR,border:`2px solid ${LFM_COLOR}`,color:'#fff',fontWeight:900,fontSize:12,letterSpacing:2,padding:'10px 20px',cursor:'pointer',fontFamily:'inherit'}}>CONNECT LAST.FM</button>
+    </div>
+  );
 
   const sub=(val,lbl)=>(
     <button onClick={()=>setSubView(val)} style={{background:'none',border:'none',borderBottom:subView===val?`2px solid ${LFM_COLOR}`:'2px solid transparent',color:subView===val?t.tx:t.mu,fontWeight:700,fontSize:11,letterSpacing:1,padding:'10px 12px',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase'}}>
