@@ -14,7 +14,6 @@
     ::-webkit-scrollbar{width:6px}
     ::-webkit-scrollbar-track{background:transparent}
     ::-webkit-scrollbar-thumb{background:#444}
-    .lfm-img{width:42px;height:42px;object-fit:cover;border:1px solid #333;flex-shrink:0}
   </style>
 </head>
 <body>
@@ -22,7 +21,7 @@
 <script type="text/babel">
 const {useState,useEffect,useMemo,useCallback} = React;
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 const PLATFORMS = {
   spotify:    {name:'Spotify',       short:'SPT', color:'#1DB954'},
   youtube:    {name:'YouTube Music', short:'YTM', color:'#FF0000'},
@@ -31,20 +30,25 @@ const PLATFORMS = {
   lastfm:     {name:'Last.fm',       short:'LFM', color:'#D51007'},
   scrobble:   {name:'Scrobbles',     short:'SCR', color:'#E8442A'},
 };
+
 const T = {
   dark:  {bg:'#0a0a0a',sf:'#111',b:'#2a2a2a',bs:'#444',tx:'#f0f0f0',mu:'#666',ab:'#1a1a1a',ib:'#0a0a0a',sh:'4px 4px 0 #333',pa:'#f0f0f0',pat:'#0a0a0a',bar:'#1e1e1e'},
   light: {bg:'#f5f5f0',sf:'#fff', b:'#222',   bs:'#000',tx:'#0a0a0a',mu:'#666',ab:'#ebebeb',ib:'#fff',   sh:'4px 4px 0 #222',pa:'#0a0a0a',pat:'#fff',   bar:'#e5e5e0'},
 };
+
 const PERIODS = [
-  {val:'7day',    label:'7D'},
-  {val:'1month',  label:'1M'},
-  {val:'3month',  label:'3M'},
-  {val:'6month',  label:'6M'},
-  {val:'12month', label:'12M'},
-  {val:'overall', label:'ALL'},
+  {val:'7day',   label:'7D'},
+  {val:'1month', label:'1M'},
+  {val:'3month', label:'3M'},
+  {val:'6month', label:'6M'},
+  {val:'12month',label:'12M'},
+  {val:'overall',label:'ALL'},
 ];
-const NOW = Date.now(), H = 3600000, D = 86400000;
-const DEMO = [
+
+const NOW=Date.now(), H=3600000, D=86400000;
+const LFM_COLOR='#D51007';
+
+const DEMO=[
   {id:1, title:'Blinding Lights',          artist:'The Weeknd',     album:'After Hours',                genre:'Pop',        platform:'spotify',    duration:'3:20'},
   {id:2, title:'Levitating',               artist:'Dua Lipa',       album:'Future Nostalgia',           genre:'Pop',        platform:'spotify',    duration:'3:23'},
   {id:3, title:'MONTERO',                  artist:'Lil Nas X',      album:'MONTERO',                    genre:'Hip-Hop',    platform:'youtube',    duration:'2:17'},
@@ -63,22 +67,32 @@ const DEMO = [
   {id:16,title:'Myth',                     artist:'Beach House',    album:'Bloom',                      genre:'Dream Pop',  platform:'lastfm',     duration:'4:52'},
   {id:17,title:'Motion Picture Soundtrack',artist:'Radiohead',      album:'Kid A',                      genre:'Alternative',platform:'lastfm',     duration:'7:02'},
 ];
+
 const DEMO_HIST=[
-  {id:101,songId:1,ts:NOW-.5*H},{id:102,songId:7,ts:NOW-1.2*H},{id:103,songId:13,ts:NOW-2.1*H},
-  {id:104,songId:3,ts:NOW-3.8*H},{id:105,songId:11,ts:NOW-5*H},{id:106,songId:4,ts:NOW-7.3*H},
-  {id:107,songId:16,ts:NOW-9*H},{id:108,songId:2,ts:NOW-D-H},{id:109,songId:9,ts:NOW-D-3*H},
-  {id:110,songId:1,ts:NOW-D-5*H},{id:111,songId:5,ts:NOW-D-8*H},{id:112,songId:14,ts:NOW-2*D-2*H},
-  {id:113,songId:8,ts:NOW-2*D-4*H},{id:114,songId:7,ts:NOW-2*D-6*H},{id:115,songId:12,ts:NOW-3*D-H},
-  {id:116,songId:6,ts:NOW-3*D-4*H},{id:117,songId:3,ts:NOW-3*D-7*H},{id:118,songId:15,ts:NOW-4*D-2*H},
+  {id:101,track:'Blinding Lights',  artist:'The Weeknd',   album:'After Hours',   ts:NOW-0.5*H,image:''},
+  {id:102,track:'Save Your Tears',  artist:'The Weeknd',   album:'After Hours',   ts:NOW-1.2*H,image:''},
+  {id:103,track:'Heat Waves',       artist:'Glass Animals',album:'Dreamland',     ts:NOW-2.1*H,image:''},
+  {id:104,track:'MONTERO',          artist:'Lil Nas X',    album:'MONTERO',       ts:NOW-3.8*H,image:''},
+  {id:105,track:'Happier Than Ever',artist:'Billie Eilish',album:'Happier Than Ever',ts:NOW-5*H,image:''},
+  {id:106,track:'drivers license',  artist:'Olivia Rodrigo',album:'SOUR',         ts:NOW-7.3*H,image:''},
+  {id:107,track:'Myth',             artist:'Beach House',  album:'Bloom',         ts:NOW-9*H,  image:''},
+  {id:108,track:'Levitating',       artist:'Dua Lipa',     album:'Future Nostalgia',ts:NOW-D-H, image:''},
+  {id:109,track:'Leave The Door Open',artist:'Silk Sonic', album:'An Evening with Silk Sonic',ts:NOW-D-3*H,image:''},
+  {id:110,track:'Blinding Lights',  artist:'The Weeknd',   album:'After Hours',   ts:NOW-D-5*H,image:''},
 ];
 
-// ── PKCE / OAuth ─────────────────────────────────────────────────────────────
-async function genPKCE(){const v=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v));const c=btoa(String.fromCharCode(...new Uint8Array(d))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');return{verifier:v,challenge:c};}
+// ── PKCE / OAuth ──────────────────────────────────────────────────────────────
+async function genPKCE(){
+  const v=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v));
+  const c=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  return {verifier:v,challenge:c};
+}
 function genState(){return Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>b.toString(16).padStart(2,'0')).join('');}
 function redirectUri(){return window.location.origin+window.location.pathname;}
 
 async function startOAuth(platform,clientId){
-  const state=genState(),ru=redirectUri();
+  const state=genState(), ru=redirectUri();
   sessionStorage.setItem('mulib_platform',platform);
   sessionStorage.setItem('mulib_state',state);
   sessionStorage.setItem('mulib_clientid',clientId);
@@ -104,17 +118,22 @@ async function startOAuth(platform,clientId){
 }
 
 async function exchangeToken(platform,code,clientId){
-  const ru=redirectUri(),verifier=sessionStorage.getItem('mulib_verifier');
-  const urls={spotify:'https://accounts.spotify.com/api/token',youtube:'https://oauth2.googleapis.com/token',tidal:'https://auth.tidal.com/v1/oauth2/token',soundcloud:'https://api.soundcloud.com/oauth2/token'};
+  const ru=redirectUri(), verifier=sessionStorage.getItem('mulib_verifier');
+  const urls={
+    spotify:    'https://accounts.spotify.com/api/token',
+    youtube:    'https://oauth2.googleapis.com/token',
+    tidal:      'https://auth.tidal.com/v1/oauth2/token',
+    soundcloud: 'https://api.soundcloud.com/oauth2/token',
+  };
   const body=platform==='soundcloud'
-    ?new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:ru,client_id:clientId,client_secret:sessionStorage.getItem('mulib_soundcloud_secret')||''})
-    :new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:ru,client_id:clientId,code_verifier:verifier});
+    ? new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:ru,client_id:clientId,client_secret:sessionStorage.getItem('mulib_soundcloud_secret')||''})
+    : new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:ru,client_id:clientId,code_verifier:verifier});
   const r=await fetch(urls[platform],{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
-  if(!r.ok){const t=await r.text();throw new Error(`Token exchange failed (${r.status}): ${t}`);}
+  if(!r.ok){const txt=await r.text();throw new Error(`Token exchange failed (${r.status}): ${txt}`);}
   return r.json();
 }
 
-// ── Platform API fetchers ─────────────────────────────────────────────────────
+// ── Platform fetchers ─────────────────────────────────────────────────────────
 const ms2t=ms=>{if(!ms)return'—';const s=Math.floor(ms/1000);return`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;};
 
 async function fetchSpotify(token){
@@ -130,7 +149,14 @@ async function fetchSpotify(token){
 }
 async function fetchYouTube(token){
   let pt='',all=[];
-  do{const p=new URLSearchParams({part:'snippet',myRating:'like',maxResults:50,...(pt&&{pageToken:pt})});const r=await fetch(`https://www.googleapis.com/youtube/v3/videos?${p}`,{headers:{Authorization:`Bearer ${token}`}});if(!r.ok)throw new Error(`YouTube ${r.status}`);const d=await r.json();all=[...all,...(d.items||[]).map(i=>({id:`ytm-${i.id}`,title:i.snippet.title,artist:i.snippet.channelTitle,album:'YouTube',genre:'Unknown',platform:'youtube',duration:'—'}))];pt=d.nextPageToken||'';}while(pt&&all.length<2000);
+  do{
+    const p=new URLSearchParams({part:'snippet',myRating:'like',maxResults:50,...(pt&&{pageToken:pt})});
+    const r=await fetch(`https://www.googleapis.com/youtube/v3/videos?${p}`,{headers:{Authorization:`Bearer ${token}`}});
+    if(!r.ok)throw new Error(`YouTube ${r.status}`);
+    const d=await r.json();
+    all=[...all,...(d.items||[]).map(i=>({id:`ytm-${i.id}`,title:i.snippet.title,artist:i.snippet.channelTitle,album:'YouTube',genre:'Unknown',platform:'youtube',duration:'—'}))];
+    pt=d.nextPageToken||'';
+  }while(pt&&all.length<2000);
   return all;
 }
 async function fetchSoundCloud(token){
@@ -146,7 +172,7 @@ async function fetchTidal(token){
   return(d.data||[]).map(i=>({id:`tdl-${i.id}`,title:i.attributes?.title||'Unknown',artist:'Unknown',album:'Unknown',genre:'Unknown',platform:'tidal',duration:'—'}));
 }
 
-// ── Last.fm API helpers ───────────────────────────────────────────────────────
+// ── Last.fm helpers ───────────────────────────────────────────────────────────
 const lfmBase='https://ws.audioscrobbler.com/2.0/';
 async function lfmGet(params){
   const r=await fetch(lfmBase+'?'+new URLSearchParams({format:'json',...params}));
@@ -155,14 +181,12 @@ async function lfmGet(params){
   if(d.error)throw new Error(`Last.fm error ${d.error}: ${d.message}`);
   return d;
 }
-
-async function fetchLastfmUser(apiKey,username){
+async function fetchLfmUser(apiKey,username){
   const d=await lfmGet({method:'user.getinfo',user:username,api_key:apiKey});
   const u=d.user;
   return{name:u.name,realname:u.realname||'',image:u.image?.find(i=>i.size==='large')?.['#text']||'',playcount:parseInt(u.playcount||0),registered:parseInt(u.registered?.unixtime||0),country:u.country||''};
 }
-
-async function fetchLastfmLovedTracks(apiKey,username){
+async function fetchLfmLoved(apiKey,username){
   let page=1,all=[];
   while(page<=20){
     const d=await lfmGet({method:'user.getlovedtracks',user:username,api_key:apiKey,limit:200,page});
@@ -174,74 +198,84 @@ async function fetchLastfmLovedTracks(apiKey,username){
   }
   return all;
 }
-
-async function fetchLastfmRecent(apiKey,username,onProgress){
-  // last 90 days
+async function fetchLfmRecent(apiKey,username,onProgress){
   const from=Math.floor((Date.now()-90*D)/1000);
-  let page=1,all=[],total=null;
+  let page=1,all=[],totalPages=null;
   while(true){
     const d=await lfmGet({method:'user.getrecenttracks',user:username,api_key:apiKey,limit:200,from,page,extended:0});
     const tracks=(d.recenttracks?.track||[]).filter(t=>!t['@attr']?.nowplaying);
     if(!tracks.length)break;
-    if(total===null)total=parseInt(d.recenttracks?.['@attr']?.totalPages||1);
+    if(totalPages===null)totalPages=parseInt(d.recenttracks?.['@attr']?.totalPages||1);
     all=[...all,...tracks.map(tr=>({
-      title:tr.name,artist:tr.artist?.['#text']||'Unknown',
+      title:tr.name,
+      artist:tr.artist?.['#text']||'Unknown',
       album:tr.album?.['#text']||'Unknown',
       ts:parseInt(tr.date?.uts||0)*1000,
       image:tr.image?.find(i=>i.size==='medium')?.['#text']||'',
     }))];
-    if(onProgress)onProgress(all.length,total*200);
-    if(page>=total||page>=50)break; // cap at 10k scrobbles
+    if(onProgress)onProgress(all.length);
+    if(page>=totalPages||page>=50)break;
     page++;
   }
   return all;
 }
-
-async function fetchLastfmTops(apiKey,username,period){
-  const [t,ar,al]=await Promise.all([
-    lfmGet({method:'user.gettoptracks',user:username,api_key:apiKey,period,limit:50}),
+async function fetchLfmTops(apiKey,username,period){
+  const [tr,ar,al]=await Promise.all([
+    lfmGet({method:'user.gettoptracks', user:username,api_key:apiKey,period,limit:50}),
     lfmGet({method:'user.gettopartists',user:username,api_key:apiKey,period,limit:50}),
-    lfmGet({method:'user.gettopalbums',user:username,api_key:apiKey,period,limit:50}),
+    lfmGet({method:'user.gettopalbums', user:username,api_key:apiKey,period,limit:50}),
   ]);
   return{
-    tracks:(t.toptracks?.track||[]).map(x=>({name:x.name,artist:x.artist?.name||'',plays:parseInt(x.playcount||0),image:x.image?.find(i=>i.size==='medium')?.['#text']||''})),
+    tracks: (tr.toptracks?.track||[]).map(x=>({name:x.name,artist:x.artist?.name||'',plays:parseInt(x.playcount||0),image:x.image?.find(i=>i.size==='medium')?.['#text']||''})),
     artists:(ar.topartists?.artist||[]).map(x=>({name:x.name,plays:parseInt(x.playcount||0),image:x.image?.find(i=>i.size==='medium')?.['#text']||''})),
-    albums:(al.topalbums?.album||[]).map(x=>({name:x.name,artist:x.artist?.name||'',plays:parseInt(x.playcount||0),image:x.image?.find(i=>i.size==='medium')?.['#text']||''})),
+    albums: (al.topalbums?.album||[]).map(x=>({name:x.name,artist:x.artist?.name||'',plays:parseInt(x.playcount||0),image:x.image?.find(i=>i.size==='medium')?.['#text']||''})),
   };
 }
 
-// ── Storage helpers ───────────────────────────────────────────────────────────
-const getSaved=(k,def)=>{try{const v=sessionStorage.getItem(k);return v?JSON.parse(v):def;}catch{return def;}};
-const setSaved=(k,v)=>{try{sessionStorage.setItem(k,JSON.stringify(v));}catch{}};
+// ── Scrobble → library dedup ──────────────────────────────────────────────────
+function scrobblesToLibrary(recent,lovedSongs){
+  const lovedSet=new Set(lovedSongs.map(s=>`${s.title}|||${s.artist}`.toLowerCase()));
+  const countMap={};
+  recent.forEach(s=>{const k=`${s.title}|||${s.artist}`.toLowerCase();countMap[k]=(countMap[k]||0)+1;});
+  const seen=new Set();
+  const out=[];
+  recent.forEach(s=>{
+    const k=`${s.title}|||${s.artist}`.toLowerCase();
+    if(!seen.has(k)&&!lovedSet.has(k)){
+      seen.add(k);
+      out.push({id:`scr-${out.length}`,title:s.title,artist:s.artist,album:s.album||'Unknown',genre:'Unknown',platform:'scrobble',duration:'—',plays:countMap[k]});
+    }
+  });
+  return out;
+}
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
-const fmtTs=ts=>{const d=NOW-ts,m=Math.floor(d/60000),h=Math.floor(d/H),dy=Math.floor(d/D);return m<60?`${m}m ago`:h<24?`${h}h ago`:dy<7?`${dy}d ago`:new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+const getSaved=(k,def)=>{try{const v=sessionStorage.getItem(k);return v?JSON.parse(v):def;}catch{return def;}};
+const setSaved=(k,v)=>{try{sessionStorage.setItem(k,JSON.stringify(v));}catch{}};
+const fmtTs=ts=>{const diff=NOW-ts,m=Math.floor(diff/60000),h=Math.floor(diff/H),dy=Math.floor(diff/D);return m<60?`${m}m ago`:h<24?`${h}h ago`:dy<7?`${dy}d ago`:new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'});};
 const fmtDate=ts=>new Date(ts).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
 const dayKey=ts=>{const d=new Date(ts);d.setHours(0,0,0,0);return d.getTime();};
 const fmtN=n=>n>=1000000?`${(n/1000000).toFixed(1)}M`:n>=1000?`${(n/1000).toFixed(1)}K`:String(n);
-const LFM_COLOR='#D51007';
 
 // ── App ───────────────────────────────────────────────────────────────────────
 function App(){
-  const [dark,setDark]         = useState(()=>getSaved('mulib_dark',true));
-  const [view,setView]         = useState('library');
-  const [search,setSearch]     = useState('');
-  const [groupBy,setGroupBy]   = useState('none');
-  const [filterP,setFilterP]   = useState('all');
-  const [showConn,setShowConn] = useState(false);
-  const [songs,setSongs]       = useState(()=>getSaved('mulib_songs',[]));
-  const [tokens,setTokens]     = useState(()=>getSaved('mulib_tokens',{}));
-  const [creds,setCreds]       = useState(()=>getSaved('mulib_creds',{}));
-  const [cbStatus,setCbStatus] = useState(null);
-  const [hRange,setHRange]     = useState('7d');
-  // Last.fm rich data
-  const [lfmUser,setLfmUser]   = useState(()=>getSaved('mulib_lfmuser_data',null));
-  const [lfmRecent,setLfmRecent]= useState(()=>getSaved('mulib_lfm_recent',[]));
-  const [lfmTops,setLfmTops]   = useState(()=>getSaved('mulib_lfm_tops',{}));
-  const [lfmPeriod,setLfmPeriod]= useState('overall');
-  const [lfmSubView,setLfmSubView]= useState('overview');
-  const [lfmFetching,setLfmFetching]= useState(false);
-  const [lfmProgress,setLfmProgress]= useState('');
+  const [dark,setDark]           = useState(()=>getSaved('mulib_dark',true));
+  const [view,setView]           = useState('library');
+  const [search,setSearch]       = useState('');
+  const [groupBy,setGroupBy]     = useState('none');
+  const [filterP,setFilterP]     = useState('all');
+  const [showConn,setShowConn]   = useState(false);
+  const [songs,setSongs]         = useState(()=>getSaved('mulib_songs',[]));
+  const [tokens,setTokens]       = useState(()=>getSaved('mulib_tokens',{}));
+  const [creds,setCreds]         = useState(()=>getSaved('mulib_creds',{}));
+  const [cbStatus,setCbStatus]   = useState(null);
+  const [hRange,setHRange]       = useState('7d');
+  const [lfmUserData,setLfmUserData]   = useState(()=>getSaved('mulib_lfm_user',null));
+  const [lfmRecent,setLfmRecent]       = useState(()=>getSaved('mulib_lfm_recent',[]));
+  const [lfmTops,setLfmTops]           = useState(()=>getSaved('mulib_lfm_tops',{}));
+  const [lfmPeriod,setLfmPeriod]       = useState('overall');
+  const [lfmSubView,setLfmSubView]     = useState('overview');
+  const [lfmFetching,setLfmFetching]   = useState(false);
 
   const t=T[dark?'dark':'light'];
   const connected=Object.keys(tokens).filter(k=>tokens[k]);
@@ -253,141 +287,140 @@ function App(){
   useEffect(()=>setSaved('mulib_songs',songs),[songs]);
   useEffect(()=>setSaved('mulib_tokens',tokens),[tokens]);
   useEffect(()=>setSaved('mulib_creds',creds),[creds]);
-  useEffect(()=>setSaved('mulib_lfmuser_data',lfmUser),[lfmUser]);
+  useEffect(()=>setSaved('mulib_lfm_user',lfmUserData),[lfmUserData]);
   useEffect(()=>setSaved('mulib_lfm_recent',lfmRecent),[lfmRecent]);
   useEffect(()=>setSaved('mulib_lfm_tops',lfmTops),[lfmTops]);
 
-  // ── OAuth callback ─────────────────────────────────────────────────────────
+  // ── OAuth callback ──────────────────────────────────────────────────────────
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
     const code=params.get('code'),state=params.get('state'),error=params.get('error');
-    const savedPlatform=sessionStorage.getItem('mulib_platform');
-    const savedState=sessionStorage.getItem('mulib_state');
-    const savedClientId=sessionStorage.getItem('mulib_clientid');
-    const clearSession=()=>['mulib_platform','mulib_state','mulib_clientid','mulib_verifier'].forEach(k=>sessionStorage.removeItem(k));
-
-    if(error){setCbStatus({status:'error',msg:`OAuth denied: ${error}`});clearSession();window.history.replaceState({},document.title,window.location.pathname);return;}
-    if(code&&savedPlatform&&state===savedState){
+    const sp=sessionStorage.getItem('mulib_platform');
+    const ss=sessionStorage.getItem('mulib_state');
+    const sc=sessionStorage.getItem('mulib_clientid');
+    const clear=()=>['mulib_platform','mulib_state','mulib_clientid','mulib_verifier'].forEach(k=>sessionStorage.removeItem(k));
+    if(error){setCbStatus({status:'error',msg:`OAuth denied: ${error}`});clear();window.history.replaceState({},document.title,window.location.pathname);return;}
+    if(code&&sp&&state===ss){
       window.history.replaceState({},document.title,window.location.pathname);
-      setCbStatus({status:'loading',msg:`Connecting ${PLATFORMS[savedPlatform]?.name}...`});
-      exchangeToken(savedPlatform,code,savedClientId)
+      setCbStatus({status:'loading',msg:`Connecting ${PLATFORMS[sp]?.name}...`});
+      exchangeToken(sp,code,sc)
         .then(td=>{
           if(!td.access_token)throw new Error(JSON.stringify(td));
           const tk=td.access_token;
-          setTokens(prev=>{const n={...prev,[savedPlatform]:tk};setSaved('mulib_tokens',n);return n;});
-          clearSession();
-          setCbStatus({status:'loading',msg:`Fetching tracks from ${PLATFORMS[savedPlatform]?.name}...`});
+          setTokens(prev=>{const n={...prev,[sp]:tk};setSaved('mulib_tokens',n);return n;});
+          clear();
+          setCbStatus({status:'loading',msg:`Fetching tracks from ${PLATFORMS[sp]?.name}...`});
           const fetchers={spotify:fetchSpotify,youtube:fetchYouTube,soundcloud:fetchSoundCloud,tidal:fetchTidal};
-          return fetchers[savedPlatform]?.(tk);
+          return fetchers[sp]?.(tk);
         })
         .then(newSongs=>{
-          setSongs(prev=>{const f=prev.filter(s=>s.platform!==savedPlatform);const n=[...f,...newSongs];setSaved('mulib_songs',n);return n;});
-          setCbStatus({status:'success',msg:`✓ Loaded ${newSongs.length} tracks from ${PLATFORMS[savedPlatform]?.name}`});
+          setSongs(prev=>{const f=prev.filter(s=>s.platform!==sp);const n=[...f,...newSongs];setSaved('mulib_songs',n);return n;});
+          setCbStatus({status:'success',msg:`✓ Loaded ${newSongs.length} tracks from ${PLATFORMS[sp]?.name}`});
         })
         .catch(e=>setCbStatus({status:'error',msg:e.message}));
     }
   },[]);
 
-  // ── Last.fm full fetch ─────────────────────────────────────────────────────
+  // ── Last.fm full connect ────────────────────────────────────────────────────
   const handleLastfm=useCallback(async(apiKey,username)=>{
     setLfmFetching(true);
-    setCbStatus({status:'loading',msg:'Connecting to Last.fm...'});
-    setSaved('mulib_lfmuser',username);
     try{
-      // User info
-      setLfmProgress('Fetching user profile...');
-      const userInfo=await fetchLastfmUser(apiKey,username);
-      setLfmUser(userInfo);
+      setCbStatus({status:'loading',msg:'Fetching Last.fm profile...'});
+      const userInfo=await fetchLfmUser(apiKey,username);
+      setLfmUserData(userInfo);
 
-      // Loved tracks → library
-      setLfmProgress('Fetching loved tracks...');
-      const loved=await fetchLastfmLovedTracks(apiKey,username);
-      setSongs(prev=>{const f=prev.filter(s=>s.platform!=='lastfm');const n=[...f,...loved];setSaved('mulib_songs',n);return n;});
+      setCbStatus({status:'loading',msg:'Fetching loved tracks...'});
+      const loved=await fetchLfmLoved(apiKey,username);
 
-      // Recent scrobbles (90 days)
-      setLfmProgress('Fetching 90-day scrobble history...');
-      const recent=await fetchLastfmRecent(apiKey,username,(done,est)=>{
-        setLfmProgress(`Fetching scrobbles... ${done}${est?'/~'+est:''}`);
+      setCbStatus({status:'loading',msg:'Fetching 90-day scrobble history...'});
+      const recent=await fetchLfmRecent(apiKey,username,done=>{
+        setCbStatus({status:'loading',msg:`Fetching scrobbles... ${done} loaded`});
       });
       setLfmRecent(recent);
 
-      // Deduplicate scrobbles → unique library tracks (excluding already-loved)
-      const lovedSet=new Set(loved.map(s=>`${s.title}|||${s.artist}`.toLowerCase()));
-      const countMap={};
-      recent.forEach(s=>{const k=`${s.title}|||${s.artist}`.toLowerCase();countMap[k]=(countMap[k]||0)+1;});
-      const seen=new Set();
-      const scrobbleSongs=[];
-      recent.forEach(s=>{
-        const k=`${s.title}|||${s.artist}`.toLowerCase();
-        if(!seen.has(k)&&!lovedSet.has(k)){
-          seen.add(k);
-          scrobbleSongs.push({id:`scr-${scrobbleSongs.length}`,title:s.title,artist:s.artist,album:s.album||'Unknown',genre:'Unknown',platform:'scrobble',duration:'—',plays:countMap[k]});
-        }
+      // Build scrobble library entries (unique, excluding loved)
+      const scrobbled=scrobblesToLibrary(recent,loved);
+
+      // Merge loved + scrobbled into songs
+      setSongs(prev=>{
+        const others=prev.filter(s=>s.platform!=='lastfm'&&s.platform!=='scrobble');
+        const merged=[...others,...loved,...scrobbled];
+        setSaved('mulib_songs',merged);
+        return merged;
       });
-      setSongs(prev=>{const f=prev.filter(s=>s.platform!=='scrobble');const n=[...f,...scrobbleSongs];setSaved('mulib_songs',n);return n;});
 
-      // Tops (overall to start)
-      setLfmProgress('Fetching top tracks, artists & albums...');
-      const tops=await fetchLastfmTops(apiKey,username,'overall');
-      setLfmTops({'overall':tops});
+      setCbStatus({status:'loading',msg:'Fetching top tracks, artists & albums...'});
+      const tops=await fetchLfmTops(apiKey,username,'overall');
+      setLfmTops({overall:tops});
 
-      setLfmFetching(false);setLfmProgress('');
-      setCbStatus({status:'success',msg:`✓ Last.fm connected — ${fmtN(userInfo.playcount)} total scrobbles · ${loved.length} loved tracks · ${scrobbleSongs.length} unique scrobbled tracks loaded`});
+      setLfmFetching(false);
+      setCbStatus({status:'success',msg:`✓ Last.fm connected — ${fmtN(userInfo.playcount)} total scrobbles · ${loved.length} loved tracks · ${scrobbled.length} unique scrobbled tracks`});
       setView('lastfm');
     }catch(e){
-      setLfmFetching(false);setLfmProgress('');
+      setLfmFetching(false);
       setCbStatus({status:'error',msg:`Last.fm: ${e.message}`});
     }
   },[]);
 
-  // ── Lazy-load tops for period ──────────────────────────────────────────────
+  // ── Lazy-load tops by period ────────────────────────────────────────────────
   const handlePeriodChange=useCallback(async(period)=>{
     setLfmPeriod(period);
-    if(lfmTops[period])return;
-    if(!lfmCreds)return;
+    if(lfmTops[period]||!lfmCreds)return;
     try{
-      const tops=await fetchLastfmTops(lfmCreds.apiKey,lfmCreds.username,period);
+      const tops=await fetchLfmTops(lfmCreds.apiKey,lfmCreds.username,period);
       setLfmTops(prev=>({...prev,[period]:tops}));
-    }catch(e){console.error('Tops fetch failed:',e);}
+    }catch(e){console.error('Tops fetch:',e);}
   },[lfmTops,lfmCreds]);
 
-  // ── Library filters ────────────────────────────────────────────────────────
+  // ── Library filters ─────────────────────────────────────────────────────────
   const filtered=useMemo(()=>allSongs.filter(s=>{
     const q=search.toLowerCase();
-    return(!q||[s.title,s.artist,s.album,s.genre].some(f=>f.toLowerCase().includes(q)))&&(filterP==='all'||s.platform===filterP);
+    return(!q||[s.title,s.artist,s.album,s.genre].some(f=>f.toLowerCase().includes(q)))
+        &&(filterP==='all'||s.platform===filterP);
   }),[allSongs,search,filterP]);
-  const grouped=useMemo(()=>{if(groupBy==='none')return null;const g={};filtered.forEach(s=>{const k=s[groupBy];if(!g[k])g[k]=[];g[k].push(s);});return Object.entries(g).sort(([a],[b])=>a.localeCompare(b));},[filtered,groupBy]);
+
+  const grouped=useMemo(()=>{
+    if(groupBy==='none')return null;
+    const g={};
+    filtered.forEach(s=>{const k=s[groupBy];if(!g[k])g[k]=[];g[k].push(s);});
+    return Object.entries(g).sort(([a],[b])=>a.localeCompare(b));
+  },[filtered,groupBy]);
+
   const pCounts=useMemo(()=>{const c={};allSongs.forEach(s=>{c[s.platform]=(c[s.platform]||0)+1;});return c;},[allSongs]);
 
-  // ── History data ───────────────────────────────────────────────────────────
-  const useRealHistory=lfmRecent.length>0;
+  // ── History ─────────────────────────────────────────────────────────────────
+  const useRealHist=lfmRecent.length>0;
   const cutoff=useMemo(()=>{const m={'24h':H*24,'7d':D*7,'30d':D*30,'90d':D*90,'all':Infinity};return NOW-(m[hRange]||D*7);},[hRange]);
-  const histSource=useMemo(()=>useRealHistory?lfmRecent.map((s,i)=>({id:i,track:s.title,artist:s.artist,album:s.album,ts:s.ts,image:s.image})):null,[useRealHistory,lfmRecent]);
-  const histF=useMemo(()=>(histSource||DEMO_HIST.map(h=>{const s=DEMO.find(d=>d.id===h.songId)||{};return{id:h.id,track:s.title,artist:s.artist,album:s.album,ts:h.ts,image:''};})).filter(h=>h.ts>=cutoff),[histSource,cutoff]);
+  const histF=useMemo(()=>{
+    const src=useRealHist
+      ? lfmRecent.map((s,i)=>({id:i,track:s.title,artist:s.artist,album:s.album,ts:s.ts,image:s.image}))
+      : DEMO_HIST;
+    return src.filter(h=>h.ts>=cutoff);
+  },[useRealHist,lfmRecent,cutoff]);
   const histByDay=useMemo(()=>{const g={};histF.forEach(h=>{const k=dayKey(h.ts);if(!g[k])g[k]=[];g[k].push(h);});return Object.entries(g).sort(([a],[b])=>Number(b)-Number(a));},[histF]);
-  const ppd=useMemo(()=>Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);d.setHours(0,0,0,0);const day=d.getTime();return{day,count:(histSource||[]).filter(h=>dayKey(h.ts)===day).length||DEMO_HIST.filter(h=>dayKey(h.ts)===day).length};}),[histSource]);
+  const ppd=useMemo(()=>Array.from({length:7},(_,i)=>{
+    const d=new Date();d.setDate(d.getDate()-6+i);d.setHours(0,0,0,0);
+    const day=d.getTime();
+    const src=useRealHist?lfmRecent.map((s,i)=>({ts:s.ts})):DEMO_HIST;
+    return{day,count:src.filter(h=>dayKey(h.ts)===day).length};
+  }),[useRealHist,lfmRecent]);
   const maxP=Math.max(...ppd.map(d=>d.count),1);
 
-  // ── Shared styles ─────────────────────────────────────────────────────────
+  // ── Shared styles ───────────────────────────────────────────────────────────
   const pb=(active,ac)=>({background:active?(ac||t.pa):'transparent',color:active?(ac?'#fff':t.pat):t.mu,border:`2px solid ${active?(ac||t.bs):t.b}`,padding:'5px 12px',fontSize:11,fontWeight:700,letterSpacing:1,cursor:'pointer',textTransform:'uppercase',fontFamily:'inherit',boxShadow:active?t.sh:'none',transition:'all .1s'});
   const nt=(active)=>({background:'none',border:'none',borderBottom:active?`3px solid ${t.tx}`:'3px solid transparent',color:active?t.tx:t.mu,fontWeight:700,fontSize:12,letterSpacing:2,padding:'0 4px',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase',height:'100%'});
-  const statCard=(label,val)=>(
-    <div style={{border:`2px solid ${t.b}`,background:t.sf,padding:'14px 16px',boxShadow:t.sh}}>
-      <div style={{fontSize:28,fontWeight:900,lineHeight:1}}>{val}</div>
-      <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:t.mu,marginTop:4}}>{label}</div>
-    </div>
-  );
 
   return(
     <div style={{fontFamily:"'Space Grotesk','IBM Plex Mono','Courier New',monospace",background:t.bg,color:t.tx,minHeight:'100vh',transition:'background .2s,color .2s'}}>
+
       {/* NAV */}
       <div style={{borderBottom:`3px solid ${t.bs}`,background:t.sf,padding:'0 24px'}}>
         <div style={{maxWidth:960,margin:'0 auto',display:'flex',alignItems:'center',gap:20,height:56}}>
           <span style={{fontWeight:900,fontSize:16,letterSpacing:3,textTransform:'uppercase'}}>MULIB</span>
           <span style={{color:t.b,fontSize:20}}>|</span>
-          <button style={nt(view==='library')}  onClick={()=>setView('library')}>LIBRARY</button>
-          <button style={nt(view==='history')}  onClick={()=>setView('history')}>HISTORY</button>
-          <button style={nt(view==='lastfm')}   onClick={()=>setView('lastfm')}>LAST.FM{lfmUser?` ✓`:''}</button>
+          <button style={nt(view==='library')} onClick={()=>setView('library')}>LIBRARY</button>
+          <button style={nt(view==='history')} onClick={()=>setView('history')}>HISTORY</button>
+          <button style={nt(view==='lastfm')}  onClick={()=>setView('lastfm')}>LAST.FM{lfmUserData?' ✓':''}</button>
           <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
             {isDemo&&<span style={{fontSize:10,color:t.mu,letterSpacing:1,fontWeight:700}}>DEMO</span>}
             {connected.filter(k=>k!=='lastfm').map(k=>(
@@ -402,8 +435,8 @@ function App(){
       {/* Status banner */}
       {cbStatus&&(
         <div style={{background:cbStatus.status==='success'?'#1DB95422':cbStatus.status==='error'?'#ef444422':'#ffffff11',borderBottom:`2px solid ${cbStatus.status==='success'?'#1DB954':cbStatus.status==='error'?'#ef4444':t.b}`,padding:'10px 24px',fontSize:12,fontWeight:700,letterSpacing:1,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span style={{color:cbStatus.status==='success'?'#1DB954':cbStatus.status==='error'?'#ef4444':t.mu}}>{lfmProgress||cbStatus.msg}</span>
-          {cbStatus.status!=='loading'&&<button onClick={()=>setCbStatus(null)} style={{background:'none',border:'none',color:t.mu,cursor:'pointer',fontFamily:'inherit',fontSize:14}}>✕</button>}
+          <span style={{color:cbStatus.status==='success'?'#1DB954':cbStatus.status==='error'?'#ef4444':t.mu}}>{cbStatus.msg}</span>
+          {cbStatus.status!=='loading'&&<button onClick={()=>setCbStatus(null)} style={{background:'none',border:'none',color:t.mu,cursor:'pointer',fontSize:14}}>✕</button>}
         </div>
       )}
 
@@ -412,30 +445,41 @@ function App(){
         {/* ══ LIBRARY ══ */}
         {view==='library'&&(<>
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:24}}>
-            {statCard('SONGS',filtered.length)}
-            {statCard('ARTISTS',new Set(filtered.map(s=>s.artist)).size)}
-            {statCard('ALBUMS',new Set(filtered.map(s=>s.album)).size)}
-            {statCard('GENRES',new Set(filtered.map(s=>s.genre)).size)}
-          </div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:16}}>
-            {[['all','ALL'],...Object.entries(PLATFORMS).map(([k,v])=>[k,v.short])].map(([key,lbl])=>(
-              <button key={key} onClick={()=>setFilterP(key)} style={pb(filterP===key,key!=='all'?PLATFORMS[key]?.color:null)}>
-                {lbl} ({key==='all'?allSongs.length:pCounts[key]||0})
-              </button>
+            {[{l:'SONGS',v:filtered.length},{l:'ARTISTS',v:new Set(filtered.map(s=>s.artist)).size},{l:'ALBUMS',v:new Set(filtered.map(s=>s.album)).size},{l:'GENRES',v:new Set(filtered.map(s=>s.genre)).size}].map(s=>(
+              <div key={s.l} style={{border:`2px solid ${t.b}`,background:t.sf,padding:'14px 16px',boxShadow:t.sh}}>
+                <div style={{fontSize:28,fontWeight:900,lineHeight:1}}>{s.v}</div>
+                <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:t.mu,marginTop:4}}>{s.l}</div>
+              </div>
             ))}
           </div>
+
+          {/* Platform pills — hide youtube/soundcloud/tidal if they have 0 real songs */}
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:16}}>
+            {[['all','ALL'],...Object.entries(PLATFORMS).map(([k,v])=>[k,v.short])].map(([key,lbl])=>{
+              const cnt=key==='all'?allSongs.length:(pCounts[key]||0);
+              if(key!=='all'&&cnt===0)return null;
+              return(
+                <button key={key} onClick={()=>setFilterP(key)} style={pb(filterP===key,key!=='all'?PLATFORMS[key]?.color:null)}>
+                  {lbl} ({cnt})
+                </button>
+              );
+            })}
+          </div>
+
           <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tracks, artists, albums..." style={{flex:1,minWidth:200,background:t.ib,border:`2px solid ${t.b}`,padding:'10px 14px',color:t.tx,fontSize:12,fontWeight:600,letterSpacing:1,outline:'none',fontFamily:'inherit'}}/>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tracks, artists, albums..." style={{flex:1,minWidth:200,background:t.ib,border:`2px solid ${t.b}`,padding:'10px 14px',color:t.tx,fontSize:12,fontWeight:600,outline:'none',fontFamily:'inherit'}}/>
             <div style={{display:'flex',border:`2px solid ${t.b}`}}>
               {[['none','ALL'],['artist','ARTIST'],['album','ALBUM'],['genre','GENRE']].map(([val,lbl],i)=>(
                 <button key={val} onClick={()=>setGroupBy(val)} style={{...pb(groupBy===val),border:'none',borderLeft:i>0?`2px solid ${t.b}`:'none',boxShadow:'none'}}>{lbl}</button>
               ))}
             </div>
           </div>
+
           {filtered.length===0
-            ?<Empty t={t}/>
-            :grouped?grouped.map(([grp,gs])=><GroupSection key={grp} title={grp} songs={gs} t={t}/>)
-            :filtered.map((s,i)=><SongRow key={s.id} song={s} t={t} index={i}/>)
+            ?<Empty t={t} msg="NO RESULTS FOUND"/>
+            :grouped
+              ?grouped.map(([grp,gs])=><GroupSection key={grp} title={grp} songs={gs} t={t}/>)
+              :filtered.map((s,i)=><SongRow key={s.id} song={s} t={t} index={i}/>)
           }
         </>)}
 
@@ -444,49 +488,51 @@ function App(){
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:24,flexWrap:'wrap'}}>
             <span style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu}}>RANGE</span>
             <div style={{display:'flex',border:`2px solid ${t.b}`}}>
-              {[['24h','24H'],['7d','7D'],['30d','30D'],...(useRealHistory?[['90d','90D']]:[]],['all','ALL']].map(([val,lbl],i)=>(
+              {[['24h','24H'],['7d','7D'],['30d','30D'],...(useRealHist?[['90d','90D']]:[]],['all','ALL']].map(([val,lbl],i)=>(
                 <button key={val} onClick={()=>setHRange(val)} style={{...pb(hRange===val),border:'none',borderLeft:i>0?`2px solid ${t.b}`:'none',boxShadow:'none'}}>{lbl}</button>
               ))}
             </div>
-            {useRealHistory&&<span style={{fontSize:10,color:LFM_COLOR,fontWeight:700,letterSpacing:1}}>LFM ✓ REAL DATA</span>}
-            <span style={{marginLeft:'auto',fontSize:11,color:t.mu,fontWeight:700,letterSpacing:1}}>{histF.length} PLAYS</span>
+            {useRealHist&&<span style={{fontSize:10,color:LFM_COLOR,fontWeight:700,letterSpacing:1}}>LFM ✓ REAL DATA</span>}
+            <span style={{marginLeft:'auto',fontSize:11,color:t.mu,fontWeight:700}}>{histF.length} PLAYS</span>
           </div>
 
-          {/* Bar chart */}
           <div style={{border:`2px solid ${t.b}`,background:t.sf,padding:20,marginBottom:20,boxShadow:t.sh}}>
             <div style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu,marginBottom:16}}>PLAYS — LAST 7 DAYS</div>
             <div style={{display:'flex',alignItems:'flex-end',gap:8,height:80}}>
               {ppd.map(({day,count})=>{
                 const h=count===0?4:Math.max(8,Math.round((count/maxP)*80));
                 const isToday=dayKey(NOW)===day;
-                return(<div key={day} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
-                  <span style={{fontSize:9,fontWeight:700,color:t.mu}}>{count||''}</span>
-                  <div style={{width:'100%',height:h,background:isToday?t.tx:t.bar,border:`1px solid ${t.b}`}}/>
-                  <span style={{fontSize:9,fontWeight:700,color:isToday?t.tx:t.mu}}>{new Date(day).toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()}</span>
-                </div>);
+                return(
+                  <div key={day} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                    <span style={{fontSize:9,fontWeight:700,color:t.mu}}>{count||''}</span>
+                    <div style={{width:'100%',height:h,background:isToday?t.tx:t.bar,border:`1px solid ${t.b}`}}/>
+                    <span style={{fontSize:9,fontWeight:700,color:isToday?t.tx:t.mu}}>{new Date(day).toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()}</span>
+                  </div>
+                );
               })}
             </div>
           </div>
 
-          {/* Timeline */}
           <div style={{border:`2px solid ${t.b}`,background:t.sf,boxShadow:t.sh}}>
             <div style={{borderBottom:`2px solid ${t.b}`,padding:'12px 16px',fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu}}>RECENT PLAYS</div>
             {histByDay.length===0
-              ?<div style={{padding:'32px 0',textAlign:'center',color:t.mu,fontSize:12,letterSpacing:2}}>NO PLAYS IN RANGE</div>
+              ?<Empty t={t} msg="NO PLAYS IN RANGE"/>
               :histByDay.map(([day,plays])=>(
                 <div key={day}>
-                  <div style={{padding:'8px 16px',background:t.ab,borderBottom:`1px solid ${t.b}`,fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu}}>{fmtDate(Number(day)).toUpperCase()} — {plays.length} PLAYS</div>
+                  <div style={{padding:'8px 16px',background:t.ab,borderBottom:`1px solid ${t.b}`,fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu}}>
+                    {fmtDate(Number(day)).toUpperCase()} — {plays.length} PLAYS
+                  </div>
                   {plays.map((h,i)=>(
                     <div key={h.id??i} style={{display:'flex',alignItems:'center',gap:14,padding:'10px 16px',borderBottom:`1px solid ${t.b}`,transition:'background .1s'}}
                       onMouseEnter={e=>e.currentTarget.style.background=t.ab}
                       onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                       <span style={{fontSize:10,color:t.mu,minWidth:52,fontWeight:700}}>{fmtTs(h.ts)}</span>
-                      {h.image&&<img src={h.image} alt="" className="lfm-img" onError={e=>e.target.style.display='none'}/>}
+                      {h.image&&<img src={h.image} alt="" style={{width:42,height:42,objectFit:'cover',border:`1px solid ${t.b}`,flexShrink:0}} onError={e=>e.target.style.display='none'}/>}
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontWeight:700,fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{h.track}</div>
                         <div style={{fontSize:11,color:t.mu,marginTop:1}}>{h.artist}{h.album&&h.album!=='Unknown'?` — ${h.album}`:''}</div>
                       </div>
-                      <span style={{fontSize:10,fontWeight:900,letterSpacing:1,color:LFM_COLOR,border:`2px solid ${LFM_COLOR}`,padding:'2px 6px',flexShrink:0}}>{useRealHistory?'LFM':'DEMO'}</span>
+                      <span style={{fontSize:10,fontWeight:900,letterSpacing:1,color:LFM_COLOR,border:`2px solid ${LFM_COLOR}`,padding:'2px 6px',flexShrink:0}}>{useRealHist?'LFM':'DEMO'}</span>
                     </div>
                   ))}
                 </div>
@@ -498,11 +544,11 @@ function App(){
         {/* ══ LAST.FM ══ */}
         {view==='lastfm'&&(
           <LastfmView
-            user={lfmUser} recent={lfmRecent} tops={lfmTops}
+            user={lfmUserData} recent={lfmRecent} tops={lfmTops}
             period={lfmPeriod} onPeriod={handlePeriodChange}
             subView={lfmSubView} setSubView={setLfmSubView}
             t={t} pb={pb} dark={dark}
-            notConnected={!lfmUser}
+            notConnected={!lfmUserData}
             onConnect={()=>setShowConn(true)}
           />
         )}
@@ -513,7 +559,7 @@ function App(){
   );
 }
 
-// ── Last.fm Dashboard ────────────────────────────────────────────────────────
+// ── Last.fm Dashboard ─────────────────────────────────────────────────────────
 function LastfmView({user,recent,tops,period,onPeriod,subView,setSubView,t,pb,dark,notConnected,onConnect}){
   if(notConnected)return(
     <div style={{border:`2px solid ${t.b}`,padding:'60px 0',textAlign:'center'}}>
@@ -525,6 +571,7 @@ function LastfmView({user,recent,tops,period,onPeriod,subView,setSubView,t,pb,da
   );
 
   const curTops=tops[period]||{tracks:[],artists:[],albums:[]};
+
   const playsPerDay=useMemo(()=>{
     const last30=Array.from({length:30},(_,i)=>{const d=new Date();d.setDate(d.getDate()-29+i);d.setHours(0,0,0,0);return d.getTime();});
     const counts={};recent.forEach(s=>{const k=dayKey(s.ts);counts[k]=(counts[k]||0)+1;});
@@ -533,33 +580,33 @@ function LastfmView({user,recent,tops,period,onPeriod,subView,setSubView,t,pb,da
   const maxD=Math.max(...playsPerDay.map(d=>d.count),1);
 
   const sub=(val,lbl)=>(
-    <button onClick={()=>setSubView(val)} style={{background:'none',border:'none',borderBottom:subView===val?`2px solid ${LFM_COLOR}`:'2px solid transparent',color:subView===val?t.tx:t.mu,fontWeight:700,fontSize:11,letterSpacing:1,padding:'10px 12px',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase'}}>{lbl}</button>
+    <button onClick={()=>setSubView(val)} style={{background:'none',border:'none',borderBottom:subView===val?`2px solid ${LFM_COLOR}`:'2px solid transparent',color:subView===val?t.tx:t.mu,fontWeight:700,fontSize:11,letterSpacing:1,padding:'10px 12px',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase'}}>
+      {lbl}
+    </button>
   );
 
   return(<>
     {/* User card */}
-    {user&&(
-      <div style={{border:`2px solid ${t.b}`,background:t.sf,padding:20,marginBottom:20,boxShadow:t.sh,display:'flex',gap:20,alignItems:'center',flexWrap:'wrap'}}>
-        {user.image&&<img src={user.image} alt={user.name} style={{width:72,height:72,border:`2px solid ${LFM_COLOR}`,objectFit:'cover',flexShrink:0}} onError={e=>e.target.style.display='none'}/>}
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:900,fontSize:20,letterSpacing:1}}>{user.name}</div>
-          {user.realname&&<div style={{color:t.mu,fontSize:12,marginTop:2}}>{user.realname}</div>}
-          <div style={{display:'flex',gap:16,marginTop:8,flexWrap:'wrap'}}>
-            <span style={{fontSize:11,color:t.mu}}><b style={{color:t.tx}}>{fmtN(user.playcount)}</b> SCROBBLES</span>
-            {user.country&&<span style={{fontSize:11,color:t.mu}}>{user.country}</span>}
-            {user.registered&&<span style={{fontSize:11,color:t.mu}}>SINCE {new Date(user.registered*1000).getFullYear()}</span>}
-          </div>
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,minWidth:220}}>
-          {[{l:'90D PLAYS',v:recent.length},{l:'TOP TRACK',v:curTops.tracks[0]?.name||'—'},{l:'TOP ARTIST',v:curTops.artists[0]?.name||'—'}].map(s=>(
-            <div key={s.l} style={{border:`1px solid ${t.b}`,padding:'8px 10px',textAlign:'center'}}>
-              <div style={{fontSize:13,fontWeight:900,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:LFM_COLOR}}>{s.v}</div>
-              <div style={{fontSize:9,fontWeight:700,letterSpacing:1,color:t.mu,marginTop:3}}>{s.l}</div>
-            </div>
-          ))}
+    <div style={{border:`2px solid ${t.b}`,background:t.sf,padding:20,marginBottom:20,boxShadow:t.sh,display:'flex',gap:20,alignItems:'center',flexWrap:'wrap'}}>
+      {user.image&&<img src={user.image} alt={user.name} style={{width:72,height:72,border:`2px solid ${LFM_COLOR}`,objectFit:'cover',flexShrink:0}} onError={e=>e.target.style.display='none'}/>}
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontWeight:900,fontSize:20,letterSpacing:1}}>{user.name}</div>
+        {user.realname&&<div style={{color:t.mu,fontSize:12,marginTop:2}}>{user.realname}</div>}
+        <div style={{display:'flex',gap:16,marginTop:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:11,color:t.mu}}><b style={{color:t.tx}}>{fmtN(user.playcount)}</b> SCROBBLES</span>
+          {user.country&&<span style={{fontSize:11,color:t.mu}}>{user.country}</span>}
+          {user.registered&&<span style={{fontSize:11,color:t.mu}}>SINCE {new Date(user.registered*1000).getFullYear()}</span>}
         </div>
       </div>
-    )}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,minWidth:220}}>
+        {[{l:'90D PLAYS',v:recent.length},{l:'TOP TRACK',v:curTops.tracks[0]?.name||'—'},{l:'TOP ARTIST',v:curTops.artists[0]?.name||'—'}].map(s=>(
+          <div key={s.l} style={{border:`1px solid ${t.b}`,padding:'8px 10px',textAlign:'center'}}>
+            <div style={{fontSize:13,fontWeight:900,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:LFM_COLOR}}>{s.v}</div>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:1,color:t.mu,marginTop:3}}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+    </div>
 
     {/* Period selector */}
     <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4,flexWrap:'wrap'}}>
@@ -576,9 +623,7 @@ function LastfmView({user,recent,tops,period,onPeriod,subView,setSubView,t,pb,da
       {sub('overview','OVERVIEW')}{sub('tracks','TOP TRACKS')}{sub('artists','TOP ARTISTS')}{sub('albums','TOP ALBUMS')}{sub('scrobbles','SCROBBLES')}
     </div>
 
-    {/* OVERVIEW */}
     {subView==='overview'&&(<>
-      {/* 30-day activity chart */}
       <div style={{border:`2px solid ${t.b}`,background:t.sf,padding:20,marginBottom:16,boxShadow:t.sh}}>
         <div style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu,marginBottom:12}}>PLAYS — LAST 30 DAYS</div>
         <div style={{display:'flex',alignItems:'flex-end',gap:2,height:60}}>
@@ -593,9 +638,8 @@ function LastfmView({user,recent,tops,period,onPeriod,subView,setSubView,t,pb,da
           <span style={{fontSize:9,color:t.mu}}>TODAY</span>
         </div>
       </div>
-      {/* Top 5 quick lists */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16}}>
-        {[{title:'TOP TRACKS',items:curTops.tracks.slice(0,5),key:'name',sub:'artist'},{title:'TOP ARTISTS',items:curTops.artists.slice(0,5),key:'name',sub:null},{title:'TOP ALBUMS',items:curTops.albums.slice(0,5),key:'name',sub:'artist'}].map(col=>(
+        {[{title:'TOP TRACKS',items:curTops.tracks.slice(0,5),nameKey:'name',sub:'artist'},{title:'TOP ARTISTS',items:curTops.artists.slice(0,5),nameKey:'name',sub:null},{title:'TOP ALBUMS',items:curTops.albums.slice(0,5),nameKey:'name',sub:'artist'}].map(col=>(
           <div key={col.title} style={{border:`2px solid ${t.b}`,background:t.sf,padding:16,boxShadow:t.sh}}>
             <div style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu,marginBottom:12}}>{col.title}</div>
             {col.items.length===0&&<div style={{fontSize:11,color:t.mu}}>Loading...</div>}
@@ -604,7 +648,7 @@ function LastfmView({user,recent,tops,period,onPeriod,subView,setSubView,t,pb,da
                 <span style={{fontSize:11,fontWeight:900,color:t.mu,minWidth:16}}>#{i+1}</span>
                 {item.image&&<img src={item.image} alt="" style={{width:32,height:32,objectFit:'cover',border:`1px solid ${t.b}`,flexShrink:0}} onError={e=>e.target.style.display='none'}/>}
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item[col.key]}</div>
+                  <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item[col.nameKey]}</div>
                   {col.sub&&<div style={{fontSize:10,color:t.mu}}>{item[col.sub]}</div>}
                 </div>
                 <span style={{fontSize:10,color:t.mu,flexShrink:0}}>{fmtN(item.plays)}</span>
@@ -615,26 +659,22 @@ function LastfmView({user,recent,tops,period,onPeriod,subView,setSubView,t,pb,da
       </div>
     </>)}
 
-    {/* TOP TRACKS */}
-    {subView==='tracks'&&<TopList items={curTops.tracks} cols={['name','artist','plays']} t={t}/>}
-    {/* TOP ARTISTS */}
-    {subView==='artists'&&<TopList items={curTops.artists} cols={['name','plays']} t={t}/>}
-    {/* TOP ALBUMS */}
-    {subView==='albums'&&<TopList items={curTops.albums} cols={['name','artist','plays']} t={t}/>}
+    {subView==='tracks'  &&<TopList items={curTops.tracks}  cols={['name','artist','plays']} t={t}/>}
+    {subView==='artists' &&<TopList items={curTops.artists} cols={['name','plays']}          t={t}/>}
+    {subView==='albums'  &&<TopList items={curTops.albums}  cols={['name','artist','plays']} t={t}/>}
 
-    {/* SCROBBLES */}
     {subView==='scrobbles'&&(
       <div style={{border:`2px solid ${t.b}`,background:t.sf,boxShadow:t.sh}}>
         <div style={{borderBottom:`2px solid ${t.b}`,padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <span style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu}}>90-DAY SCROBBLES</span>
           <span style={{fontSize:10,color:t.mu,fontWeight:700}}>{recent.length} TOTAL</span>
         </div>
-        {recent.length===0&&<div style={{padding:'32px 0',textAlign:'center',color:t.mu,fontSize:12,letterSpacing:2}}>NO SCROBBLES LOADED</div>}
+        {recent.length===0&&<Empty t={t} msg="NO SCROBBLES LOADED"/>}
         {recent.slice(0,200).map((s,i)=>(
           <div key={i} style={{display:'flex',alignItems:'center',gap:14,padding:'10px 16px',borderBottom:`1px solid ${t.b}`,transition:'background .1s'}}
             onMouseEnter={e=>e.currentTarget.style.background=t.ab}
             onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-            {s.image&&<img src={s.image} alt="" className="lfm-img" onError={e=>e.target.style.display='none'}/>}
+            {s.image&&<img src={s.image} alt="" style={{width:42,height:42,objectFit:'cover',border:`1px solid ${t.b}`,flexShrink:0}} onError={e=>e.target.style.display='none'}/>}
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontWeight:700,fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.title}</div>
               <div style={{fontSize:11,color:t.mu,marginTop:1}}>{s.artist}{s.album&&s.album!=='Unknown'?` — ${s.album}`:''}</div>
@@ -649,7 +689,7 @@ function LastfmView({user,recent,tops,period,onPeriod,subView,setSubView,t,pb,da
 }
 
 function TopList({items,cols,t}){
-  if(!items?.length)return<div style={{border:`2px solid ${t.b}`,padding:'32px 0',textAlign:'center',color:t.mu,fontSize:12,letterSpacing:2}}>NO DATA — TRY ANOTHER PERIOD</div>;
+  if(!items?.length)return<Empty t={t} msg="NO DATA — TRY ANOTHER PERIOD"/>;
   return(
     <div style={{border:`2px solid ${t.b}`,background:t.sf,boxShadow:t.sh}}>
       {items.map((item,i)=>(
@@ -669,7 +709,7 @@ function TopList({items,cols,t}){
   );
 }
 
-// ── Shared components ─────────────────────────────────────────────────────────
+// ── Shared UI ─────────────────────────────────────────────────────────────────
 function SongRow({song,t,index}){
   const p=PLATFORMS[song.platform];
   return(
@@ -683,10 +723,11 @@ function SongRow({song,t,index}){
       </div>
       <span style={{border:`1px solid ${t.b}`,color:t.mu,fontSize:10,fontWeight:700,letterSpacing:1,padding:'2px 7px',textTransform:'uppercase',flexShrink:0}}>{song.genre}</span>
       <span style={{fontSize:10,fontWeight:900,letterSpacing:1,color:p.color,border:`2px solid ${p.color}`,padding:'2px 6px',flexShrink:0}}>{p.short}</span>
-      <span style={{color:t.mu,fontSize:12,fontWeight:700,minWidth:36,textAlign:'right'}}>{song.plays?`${song.plays}×`:song.duration}</span>
+      <span style={{color:t.mu,fontSize:12,fontWeight:700,minWidth:42,textAlign:'right'}}>{song.plays?`${song.plays}×`:song.duration}</span>
     </div>
   );
 }
+
 function GroupSection({title,songs,t}){
   const [open,setOpen]=useState(true);
   return(
@@ -700,25 +741,28 @@ function GroupSection({title,songs,t}){
     </div>
   );
 }
-function Empty({t}){return<div style={{border:`2px solid ${t.b}`,padding:'40px 0',textAlign:'center',color:t.mu,letterSpacing:2,fontSize:12}}>NO RESULTS FOUND</div>;}
+
+function Empty({t,msg}){
+  return<div style={{border:`2px solid ${t.b}`,padding:'40px 0',textAlign:'center',color:t.mu,letterSpacing:2,fontSize:12}}>{msg||'NO RESULTS'}</div>;
+}
 
 // ── Connect Modal ─────────────────────────────────────────────────────────────
 function ConnectModal({onClose,t,dark,creds,setCreds,onOAuth,onLastfm}){
-  const [tab,setTab]       = useState('lastfm');
-  const [local,setLocal]   = useState({...creds});
-  const [lfmUser,setLfmUser]= useState(getSaved('mulib_lfmuser','')||'');
-  const [secret,setSecret] = useState(getSaved('mulib_soundcloud_secret','')||'');
-  const [busy,setBusy]     = useState(false);
-  const [msg,setMsg]       = useState('');
+  const [tab,setTab]         = useState('lastfm');
+  const [local,setLocal]     = useState({...creds});
+  const [lfmUser,setLfmUser] = useState(getSaved('mulib_lfmuser','')||'');
+  const [secret,setSecret]   = useState(getSaved('mulib_soundcloud_secret','')||'');
+  const [busy,setBusy]       = useState(false);
+  const [msg,setMsg]         = useState('');
   const ru=redirectUri();
   const inp={width:'100%',boxSizing:'border-box',background:t.ib,border:`2px solid ${t.b}`,padding:'10px 12px',color:t.tx,fontSize:12,fontFamily:'inherit',outline:'none',marginBottom:8};
   const lbl={display:'block',fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu,marginBottom:6,marginTop:12};
   const DOCS={
-    spotify:    {note:'Create app → set Redirect URI → copy Client ID. PKCE — no secret needed.',       url:'https://developer.spotify.com/dashboard'},
+    spotify:    {note:'Create app → set Redirect URI → copy Client ID. PKCE — no secret needed.',              url:'https://developer.spotify.com/dashboard'},
     youtube:    {note:'New project → YouTube Data API v3 → OAuth 2.0 Client ID (Web). PKCE — no secret needed.',url:'https://console.cloud.google.com'},
-    soundcloud: {note:'Register app → set Redirect URI. Requires both Client ID and Client Secret.',    url:'https://developers.soundcloud.com'},
-    tidal:      {note:'Create app → set Redirect URI. PKCE — no secret needed.',                       url:'https://developer.tidal.com'},
-    lastfm:     {note:'Create API account → copy API Key. Enter your username. No redirect needed.',   url:'https://www.last.fm/api/account/create'},
+    soundcloud: {note:'Register app → set Redirect URI. Requires both Client ID and Client Secret.',           url:'https://developers.soundcloud.com'},
+    tidal:      {note:'Create app → set Redirect URI. PKCE — no secret needed.',                              url:'https://developer.tidal.com'},
+    lastfm:     {note:'Create API account → copy API Key + enter username. No redirect needed.',              url:'https://www.last.fm/api/account/create'},
   };
   function save(platform,val){const n={...local,[platform]:val};setLocal(n);setCreds(n);setSaved('mulib_creds',n);}
   async function connect(){
@@ -747,7 +791,7 @@ function ConnectModal({onClose,t,dark,creds,setCreds,onOAuth,onLastfm}){
           <div style={{padding:'6px 10px',border:`1px solid ${t.b}`,fontFamily:'monospace',fontSize:11,color:t.tx,wordBreak:'break-all',background:t.ib}}>{ru}</div>
         </div>
         <div style={{display:'flex',borderBottom:`2px solid ${t.b}`,overflowX:'auto'}}>
-          {Object.entries(PLATFORMS).map(([key,p])=>(
+          {Object.entries(PLATFORMS).filter(([k])=>k!=='scrobble').map(([key,p])=>(
             <button key={key} onClick={()=>{setTab(key);setMsg('');}} style={{flex:1,minWidth:50,background:tab===key?t.ab:'transparent',border:'none',borderBottom:tab===key?`3px solid ${p.color}`:'3px solid transparent',color:tab===key?t.tx:t.mu,fontWeight:700,fontSize:9,letterSpacing:.5,padding:'12px 4px',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase'}}>{p.short}</button>
           ))}
         </div>
