@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MULIB — Unified Music Library</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{overflow-x:hidden}
+    input::placeholder{opacity:.4;text-transform:uppercase}
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#444}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo} = React;
+
+// ── Constants ────────────────────────────────────────────────────────────────
+const PLATFORMS = {
+  spotify:    {name:'Spotify',       short:'SPT', color:'#1DB954'},
+  youtube:    {name:'YouTube Music', short:'YTM', color:'#FF0000'},
+  soundcloud: {name:'SoundCloud',    short:'SND', color:'#FF5500'},
+  tidal:      {name:'Tidal',         short:'TDL', color:'#00BFFF'},
+  lastfm:     {name:'Last.fm',       short:'LFM', color:'#D51007'},
+};
+const T = {
+  dark:  {bg:'#0a0a0a',sf:'#111',b:'#2a2a2a',bs:'#444',tx:'#f0f0f0',mu:'#666',ab:'#1a1a1a',ib:'#0a0a0a',sh:'4px 4px 0 #333',pa:'#f0f0f0',pat:'#0a0a0a',bar:'#1e1e1e'},
+  light: {bg:'#f5f5f0',sf:'#fff', b:'#222',   bs:'#000',tx:'#0a0a0a',mu:'#666',ab:'#ebebeb',ib:'#fff',   sh:'4px 4px 0 #222',pa:'#0a0a0a',pat:'#fff',   bar:'#e5e5e0'},
+};
+const NOW = Date.now(), H = 3600000, D = 86400000;
+const DEMO = [
+  {id:1, title:'Blinding Lights',          artist:'The Weeknd',     album:'After Hours',                genre:'Pop',        platform:'spotify',    duration:'3:20'},
+  {id:2, title:'Levitating',               artist:'Dua Lipa',       album:'Future Nostalgia',           genre:'Pop',        platform:'spotify',    duration:'3:23'},
+  {id:3, title:'MONTERO',                  artist:'Lil Nas X',      album:'MONTERO',                    genre:'Hip-Hop',    platform:'youtube',    duration:'2:17'},
+  {id:4, title:'drivers license',          artist:'Olivia Rodrigo', album:'SOUR',                       genre:'Pop',        platform:'spotify',    duration:'4:02'},
+  {id:5, title:'good 4 u',                 artist:'Olivia Rodrigo', album:'SOUR',                       genre:'Pop',        platform:'soundcloud', duration:'2:58'},
+  {id:6, title:'Peaches',                  artist:'Justin Bieber',  album:'Justice',                    genre:'R&B',        platform:'tidal',      duration:'3:18'},
+  {id:7, title:'Save Your Tears',          artist:'The Weeknd',     album:'After Hours',                genre:'Pop',        platform:'spotify',    duration:'3:35'},
+  {id:8, title:'Industry Baby',            artist:'Lil Nas X',      album:'MONTERO',                    genre:'Hip-Hop',    platform:'youtube',    duration:'3:32'},
+  {id:9, title:'Leave The Door Open',      artist:'Silk Sonic',     album:'An Evening with Silk Sonic', genre:'R&B',        platform:'tidal',      duration:'4:02'},
+  {id:10,title:'Stay',                     artist:'The Kid LAROI',  album:'F*CK LOVE 3',                genre:'Pop',        platform:'soundcloud', duration:'2:21'},
+  {id:11,title:'Happier Than Ever',        artist:'Billie Eilish',  album:'Happier Than Ever',          genre:'Alternative',platform:'spotify',    duration:'4:58'},
+  {id:12,title:'Therefore I Am',           artist:'Billie Eilish',  album:'Happier Than Ever',          genre:'Alternative',platform:'lastfm',     duration:'2:54'},
+  {id:13,title:'Heat Waves',               artist:'Glass Animals',  album:'Dreamland',                  genre:'Indie',      platform:'youtube',    duration:'3:59'},
+  {id:14,title:'Solar Power',              artist:'Lorde',          album:'Solar Power',                genre:'Indie',      platform:'lastfm',     duration:'3:54'},
+  {id:15,title:'Mood',                     artist:'24kGoldn',       album:'El Dorado',                  genre:'Hip-Hop',    platform:'soundcloud', duration:'2:20'},
+  {id:16,title:'Myth',                     artist:'Beach House',    album:'Bloom',                      genre:'Dream Pop',  platform:'lastfm',     duration:'4:52'},
+  {id:17,title:'Motion Picture Soundtrack',artist:'Radiohead',      album:'Kid A',                      genre:'Alternative',platform:'lastfm',     duration:'7:02'},
+];
+const DEMO_HIST = [
+  {id:101,songId:1,ts:NOW-0.5*H},{id:102,songId:7,ts:NOW-1.2*H},{id:103,songId:13,ts:NOW-2.1*H},
+  {id:104,songId:3,ts:NOW-3.8*H},{id:105,songId:11,ts:NOW-5*H},{id:106,songId:4,ts:NOW-7.3*H},
+  {id:107,songId:16,ts:NOW-9*H},{id:108,songId:2,ts:NOW-D-H},{id:109,songId:9,ts:NOW-D-3*H},
+  {id:110,songId:1,ts:NOW-D-5*H},{id:111,songId:5,ts:NOW-D-8*H},{id:112,songId:14,ts:NOW-2*D-2*H},
+  {id:113,songId:8,ts:NOW-2*D-4*H},{id:114,songId:7,ts:NOW-2*D-6*H},{id:115,songId:12,ts:NOW-3*D-H},
+  {id:116,songId:6,ts:NOW-3*D-4*H},{id:117,songId:3,ts:NOW-3*D-7*H},{id:118,songId:15,ts:NOW-4*D-2*H},
+  {id:119,songId:1,ts:NOW-4*D-5*H},{id:120,songId:10,ts:NOW-4*D-9*H},
+];
+
+// ── PKCE + OAuth ─────────────────────────────────────────────────────────────
+async function genPKCE() {
+  const v = Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v));
+  const c = btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  return {verifier:v, challenge:c};
+}
+function genState(){return Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>b.toString(16).padStart(2,'0')).join('');}
+function redirectUri(){return window.location.origin+window.location.pathname;}
+
+async function startOAuth(platform, clientId) {
+  const state = genState();
+  sessionStorage.setItem('mulib_platform', platform);
+  sessionStorage.setItem('mulib_state', state);
+  sessionStorage.setItem('mulib_clientid', clientId);
+  const ru = redirectUri();
+  let url;
+
+  if (platform === 'spotify') {
+    const {verifier,challenge} = await genPKCE();
+    sessionStorage.setItem('mulib_verifier', verifier);
+    url = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({
+      client_id:clientId, response_type:'code', redirect_uri:ru,
+      scope:'user-library-read', state, code_challenge_method:'S256', code_challenge:challenge
+    });
+  } else if (platform === 'youtube') {
+    const {verifier,challenge} = await genPKCE();
+    sessionStorage.setItem('mulib_verifier', verifier);
+    url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+      client_id:clientId, response_type:'code', redirect_uri:ru,
+      scope:'https://www.googleapis.com/auth/youtube.readonly',
+      state, code_challenge_method:'S256', code_challenge:challenge, access_type:'online'
+    });
+  } else if (platform === 'soundcloud') {
+    // SoundCloud does not support PKCE; uses Authorization Code with client_secret
+    // For a personal app the secret can be stored here — replace CLIENT_SECRET below
+    const clientSecret = sessionStorage.getItem('mulib_soundcloud_secret')||'';
+    if (!clientSecret) { alert('Enter your SoundCloud client secret in settings.'); return; }
+    url = 'https://soundcloud.com/connect?' + new URLSearchParams({
+      client_id:clientId, redirect_uri:ru, response_type:'code', scope:'non-expiring', state
+    });
+  } else if (platform === 'tidal') {
+    const {verifier,challenge} = await genPKCE();
+    sessionStorage.setItem('mulib_verifier', verifier);
+    url = 'https://login.tidal.com/authorize?' + new URLSearchParams({
+      client_id:clientId, response_type:'code', redirect_uri:ru,
+      scope:'r_usr+w_usr', state, code_challenge_method:'S256', code_challenge:challenge
+    });
+  }
+  window.location.href = url;
+}
+
+async function exchangeToken(platform, code, clientId) {
+  const verifier = sessionStorage.getItem('mulib_verifier');
+  const ru = redirectUri();
+  const urls = {
+    spotify:   'https://accounts.spotify.com/api/token',
+    youtube:   'https://oauth2.googleapis.com/token',
+    tidal:     'https://auth.tidal.com/v1/oauth2/token',
+    soundcloud:'https://api.soundcloud.com/oauth2/token',
+  };
+  const body = platform === 'soundcloud'
+    ? new URLSearchParams({
+        grant_type:'authorization_code', code, redirect_uri:ru,
+        client_id:clientId, client_secret:sessionStorage.getItem('mulib_soundcloud_secret')||''
+      })
+    : new URLSearchParams({
+        grant_type:'authorization_code', code, redirect_uri:ru,
+        client_id:clientId, code_verifier:verifier
+      });
+  const r = await fetch(urls[platform], {
+    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body
+  });
+  if (!r.ok) { const t=await r.text(); throw new Error(`Token exchange failed (${r.status}): ${t}`); }
+  return r.json();
+}
+
+// ── API Fetchers ──────────────────────────────────────────────────────────────
+const ms2t = ms => { if(!ms) return '—'; const s=Math.floor(ms/1000); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; };
+
+async function fetchSpotify(token) {
+  let url='https://api.spotify.com/v1/me/tracks?limit=50', all=[];
+  while (url && all.length<2000) {
+    const r=await fetch(url,{headers:{Authorization:`Bearer ${token}`}});
+    if(!r.ok) throw new Error(`Spotify ${r.status}`);
+    const d=await r.json();
+    all=[...all,...(d.items||[]).map(({track})=>({
+      id:`spt-${track.id}`,title:track.name,
+      artist:track.artists.map(a=>a.name).join(', '),
+      album:track.album.name,genre:'Unknown',platform:'spotify',
+      duration:ms2t(track.duration_ms)
+    }))];
+    url=d.next;
+  }
+  return all;
+}
+
+async function fetchYouTube(token) {
+  let pt='',all=[];
+  do {
+    const p=new URLSearchParams({part:'snippet',myRating:'like',maxResults:50,...(pt&&{pageToken:pt})});
+    const r=await fetch(`https://www.googleapis.com/youtube/v3/videos?${p}`,{headers:{Authorization:`Bearer ${token}`}});
+    if(!r.ok) throw new Error(`YouTube ${r.status}`);
+    const d=await r.json();
+    all=[...all,...(d.items||[]).map(i=>({
+      id:`ytm-${i.id}`,title:i.snippet.title,artist:i.snippet.channelTitle,
+      album:'YouTube',genre:'Unknown',platform:'youtube',duration:'—'
+    }))];
+    pt=d.nextPageToken||'';
+  } while(pt&&all.length<2000);
+  return all;
+}
+
+async function fetchSoundCloud(token) {
+  const r=await fetch('https://api.soundcloud.com/me/likes/tracks?limit=200',{headers:{Authorization:`OAuth ${token}`}});
+  if(!r.ok) throw new Error(`SoundCloud ${r.status}`);
+  const d=await r.json();
+  return (Array.isArray(d)?d:d.collection||[]).map(t=>({
+    id:`snd-${t.id}`,title:t.title,artist:t.user?.username||'Unknown',
+    album:'SoundCloud',genre:t.genre||'Unknown',platform:'soundcloud',duration:ms2t(t.duration)
+  }));
+}
+
+async function fetchTidal(token) {
+  const r=await fetch('https://openapi.tidal.com/v2/my-collection/tracks?limit=50&countryCode=US',{
+    headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.api+json'}
+  });
+  if(!r.ok) throw new Error(`Tidal ${r.status}`);
+  const d=await r.json();
+  return (d.data||[]).map(i=>({
+    id:`tdl-${i.id}`,title:i.attributes?.title||'Unknown',
+    artist:'Unknown',album:'Unknown',genre:'Unknown',platform:'tidal',duration:'—'
+  }));
+}
+
+async function fetchLastfm(apiKey, username) {
+  let page=1,all=[];
+  while(page<=20) {
+    const p=new URLSearchParams({method:'user.getlovedtracks',user:username,api_key:apiKey,format:'json',limit:200,page});
+    const r=await fetch(`https://ws.audioscrobbler.com/2.0/?${p}`);
+    if(!r.ok) throw new Error(`Last.fm ${r.status}`);
+    const d=await r.json();
+    if(d.error) throw new Error(d.message);
+    const tracks=d.lovedtracks?.track||[];
+    if(!tracks.length) break;
+    all=[...all,...tracks.map((tr,i)=>({
+      id:`lfm-${page}-${i}`,title:tr.name,artist:tr.artist?.name||'Unknown',
+      album:'Unknown Album',genre:'Unknown',platform:'lastfm',duration:'—'
+    }))];
+    if(all.length>=parseInt(d.lovedtracks?.['@attr']?.total||0)) break;
+    page++;
+  }
+  return all;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fmtTs = ts => { const d=NOW-ts,m=Math.floor(d/60000),h=Math.floor(d/H),dy=Math.floor(d/D); return m<60?`${m}m ago`:h<24?`${h}h ago`:dy<7?`${dy}d ago`:new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+const fmtDate = ts => new Date(ts).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+const dayKey = ts => { const d=new Date(ts); d.setHours(0,0,0,0); return d.getTime(); };
+const getSaved = (k,def) => { try{const v=sessionStorage.getItem(k); return v?JSON.parse(v):def;}catch{return def;} };
+const setSaved = (k,v) => { try{sessionStorage.setItem(k,JSON.stringify(v));}catch{} };
+
+// ── App ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [dark,setDark]       = useState(()=>getSaved('mulib_dark',true));
+  const [view,setView]       = useState('library');
+  const [search,setSearch]   = useState('');
+  const [groupBy,setGroupBy] = useState('none');
+  const [filterP,setFilterP] = useState('all');
+  const [showConn,setShowConn] = useState(false);
+  const [songs,setSongs]     = useState(()=>getSaved('mulib_songs',[]));
+  const [tokens,setTokens]   = useState(()=>getSaved('mulib_tokens',{}));
+  const [creds,setCreds]     = useState(()=>getSaved('mulib_creds',{}));
+  const [cbStatus,setCbStatus] = useState(null); // {platform, status, msg}
+  const [hRange,setHRange]   = useState('7d');
+
+  const t = T[dark?'dark':'light'];
+  useEffect(()=>setSaved('mulib_dark',dark),[dark]);
+  useEffect(()=>setSaved('mulib_songs',songs),[songs]);
+  useEffect(()=>setSaved('mulib_tokens',tokens),[tokens]);
+  useEffect(()=>setSaved('mulib_creds',creds),[creds]);
+
+  // ── Handle OAuth callback on page load ──────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const code = params.get('code');
+    const state = params.get('state');
+    const accessToken = hashParams.get('access_token'); // implicit (SoundCloud fallback)
+    const error = params.get('error');
+    const savedPlatform = sessionStorage.getItem('mulib_platform');
+    const savedState = sessionStorage.getItem('mulib_state');
+    const savedClientId = sessionStorage.getItem('mulib_clientid');
+
+    if (error) {
+      setCbStatus({platform:savedPlatform,status:'error',msg:`OAuth denied: ${error}`});
+      clearOAuthSession();
+      window.history.replaceState({},document.title,window.location.pathname);
+      return;
+    }
+
+    if (code && savedPlatform && state === savedState) {
+      setCbStatus({platform:savedPlatform,status:'loading',msg:`Exchanging token for ${PLATFORMS[savedPlatform]?.name}...`});
+      window.history.replaceState({},document.title,window.location.pathname);
+      exchangeToken(savedPlatform, code, savedClientId)
+        .then(td => {
+          const tk = td.access_token;
+          if (!tk) throw new Error(JSON.stringify(td));
+          setTokens(prev=>{const n={...prev,[savedPlatform]:tk};setSaved('mulib_tokens',n);return n;});
+          clearOAuthSession();
+          setCbStatus({platform:savedPlatform,status:'fetching',msg:`Fetching tracks from ${PLATFORMS[savedPlatform]?.name}...`});
+          return fetchTracks(savedPlatform, tk, null, null);
+        })
+        .then(newSongs => {
+          setSongs(prev=>{const filtered=prev.filter(s=>s.platform!==savedPlatform);const n=[...filtered,...newSongs];setSaved('mulib_songs',n);return n;});
+          setCbStatus({platform:savedPlatform,status:'success',msg:`✓ Loaded ${newSongs.length} tracks from ${PLATFORMS[savedPlatform]?.name}`});
+        })
+        .catch(e=>setCbStatus({platform:savedPlatform,status:'error',msg:e.message}));
+      return;
+    }
+
+    // SoundCloud implicit flow — token in hash
+    if (accessToken && savedPlatform === 'soundcloud') {
+      window.history.replaceState({},document.title,window.location.pathname);
+      setTokens(prev=>{const n={...prev,soundcloud:accessToken};setSaved('mulib_tokens',n);return n;});
+      clearOAuthSession();
+      setCbStatus({platform:'soundcloud',status:'fetching',msg:'Fetching SoundCloud tracks...'});
+      fetchSoundCloud(accessToken)
+        .then(newSongs=>{
+          setSongs(prev=>{const filtered=prev.filter(s=>s.platform!=='soundcloud');const n=[...filtered,...newSongs];setSaved('mulib_songs',n);return n;});
+          setCbStatus({platform:'soundcloud',status:'success',msg:`✓ Loaded ${newSongs.length} tracks from SoundCloud`});
+        })
+        .catch(e=>setCbStatus({platform:'soundcloud',status:'error',msg:e.message}));
+    }
+  }, []);
+
+  function clearOAuthSession(){
+    ['mulib_platform','mulib_state','mulib_clientid','mulib_verifier'].forEach(k=>sessionStorage.removeItem(k));
+  }
+
+  async function fetchTracks(platform, token, apiKey, username) {
+    if (platform==='spotify')    return fetchSpotify(token);
+    if (platform==='youtube')    return fetchYouTube(token);
+    if (platform==='soundcloud') return fetchSoundCloud(token);
+    if (platform==='tidal')      return fetchTidal(token);
+    if (platform==='lastfm')     return fetchLastfm(apiKey, username);
+    return [];
+  }
+
+  async function handleLastfm(apiKey, username) {
+    setCbStatus({platform:'lastfm',status:'fetching',msg:'Fetching Last.fm loved tracks...'});
+    try {
+      const s = await fetchLastfm(apiKey, username);
+      setSongs(prev=>{const filtered=prev.filter(s=>s.platform!=='lastfm');const n=[...filtered,...s];setSaved('mulib_songs',n);return n;});
+      setCbStatus({platform:'lastfm',status:'success',msg:`✓ Loaded ${s.length} loved tracks from Last.fm`});
+    } catch(e) {
+      setCbStatus({platform:'lastfm',status:'error',msg:e.message});
+    }
+  }
+
+  async function handleOAuth(platform, clientId) {
+    setSaved('mulib_creds',{...creds,[platform]:clientId});
+    await startOAuth(platform, clientId);
+  }
+
+  const allSongs = songs.length ? songs : DEMO;
+  const isDemo = !songs.length;
+  const connected = Object.keys(tokens).filter(k=>tokens[k]);
+
+  const filtered = useMemo(()=>allSongs.filter(s=>{
+    const q=search.toLowerCase();
+    return (!q||[s.title,s.artist,s.album,s.genre].some(f=>f.toLowerCase().includes(q)))
+        &&(filterP==='all'||s.platform===filterP);
+  }),[allSongs,search,filterP]);
+
+  const grouped = useMemo(()=>{
+    if(groupBy==='none') return null;
+    const g={};filtered.forEach(s=>{const k=s[groupBy];if(!g[k])g[k]=[];g[k].push(s);});
+    return Object.entries(g).sort(([a],[b])=>a.localeCompare(b));
+  },[filtered,groupBy]);
+
+  const songMap = useMemo(()=>Object.fromEntries(DEMO.map(s=>[s.id,s])),[]);
+  const cutoff = useMemo(()=>{const m={'24h':H*24,'7d':D*7,'30d':D*30,'all':Infinity};return NOW-(m[hRange]||D*7);},[hRange]);
+  const histF = useMemo(()=>DEMO_HIST.filter(h=>h.ts>=cutoff),[cutoff]);
+  const histByDay = useMemo(()=>{const g={};histF.forEach(h=>{const k=dayKey(h.ts);if(!g[k])g[k]=[];g[k].push(h);});return Object.entries(g).sort(([a],[b])=>Number(b)-Number(a));},[histF]);
+  const topTracks = useMemo(()=>{const c={};histF.forEach(h=>{c[h.songId]=(c[h.songId]||0)+1;});return Object.entries(c).sort(([,a],[,b])=>b-a).slice(0,5).map(([id,count])=>({song:songMap[id],count}));},[histF,songMap]);
+  const ppd = useMemo(()=>Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);d.setHours(0,0,0,0);return{day:d.getTime(),count:DEMO_HIST.filter(h=>dayKey(h.ts)===d.getTime()).length};}),[]);
+  const maxP = Math.max(...ppd.map(d=>d.count),1);
+  const pCounts = useMemo(()=>{const c={};allSongs.forEach(s=>{c[s.platform]=(c[s.platform]||0)+1;});return c;},[allSongs]);
+
+  const pb=(active,ac)=>({background:active?(ac||t.pa):'transparent',color:active?(ac?'#fff':t.pat):t.mu,border:`2px solid ${active?(ac||t.bs):t.b}`,padding:'5px 12px',fontSize:11,fontWeight:700,letterSpacing:1,cursor:'pointer',textTransform:'uppercase',fontFamily:'inherit',boxShadow:active?t.sh:'none',transition:'all .1s'});
+  const nt=(active)=>({background:'none',border:'none',borderBottom:active?`3px solid ${t.tx}`:'3px solid transparent',color:active?t.tx:t.mu,fontWeight:700,fontSize:12,letterSpacing:2,padding:'0 4px',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase',height:'100%'});
+
+  return (
+    <div style={{fontFamily:"'Space Grotesk','IBM Plex Mono','Courier New',monospace",background:t.bg,color:t.tx,minHeight:'100vh',transition:'background .2s,color .2s'}}>
+      {/* NAV */}
+      <div style={{borderBottom:`3px solid ${t.bs}`,background:t.sf,padding:'0 24px'}}>
+        <div style={{maxWidth:900,margin:'0 auto',display:'flex',alignItems:'center',gap:20,height:56}}>
+          <span style={{fontWeight:900,fontSize:16,letterSpacing:3,textTransform:'uppercase'}}>MULIB</span>
+          <span style={{color:t.b,fontSize:20}}>|</span>
+          <button style={nt(view==='library')} onClick={()=>setView('library')}>LIBRARY</button>
+          <button style={nt(view==='history')} onClick={()=>setView('history')}>HISTORY</button>
+          <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
+            {isDemo&&<span style={{fontSize:10,color:t.mu,letterSpacing:1,fontWeight:700}}>DEMO</span>}
+            {connected.map(k=>(
+              <span key={k} style={{fontSize:10,fontWeight:900,color:PLATFORMS[k].color,border:`1px solid ${PLATFORMS[k].color}`,padding:'2px 6px',letterSpacing:1}}>{PLATFORMS[k].short} ✓</span>
+            ))}
+            <button onClick={()=>setDark(d=>!d)} style={{...pb(false),padding:'5px 10px'}}>{dark?'☀ LIGHT':'● DARK'}</button>
+            <button onClick={()=>setShowConn(true)} style={{background:t.tx,color:t.bg,border:`2px solid ${t.bs}`,padding:'5px 14px',fontSize:11,fontWeight:900,letterSpacing:1,cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase',boxShadow:t.sh}}>+ CONNECT</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Callback status banner */}
+      {cbStatus&&(
+        <div style={{background:cbStatus.status==='success'?'#1DB95422':cbStatus.status==='error'?'#ef444422':'#f0f0f022',borderBottom:`2px solid ${cbStatus.status==='success'?'#1DB954':cbStatus.status==='error'?'#ef4444':t.b}`,padding:'10px 24px',fontSize:12,fontWeight:700,letterSpacing:1,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{color:cbStatus.status==='success'?'#1DB954':cbStatus.status==='error'?'#ef4444':t.mu}}>{cbStatus.msg}</span>
+          <button onClick={()=>setCbStatus(null)} style={{background:'none',border:'none',color:t.mu,cursor:'pointer',fontFamily:'inherit',fontSize:14}}>✕</button>
+        </div>
+      )}
+
+      <div style={{maxWidth:900,margin:'0 auto',padding:'28px 24px'}}>
+        {/* ── LIBRARY ── */}
+        {view==='library'&&(<>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:24}}>
+            {[{l:'SONGS',v:filtered.length},{l:'ARTISTS',v:new Set(filtered.map(s=>s.artist)).size},{l:'ALBUMS',v:new Set(filtered.map(s=>s.album)).size},{l:'GENRES',v:new Set(filtered.map(s=>s.genre)).size}].map(s=>(
+              <div key={s.l} style={{border:`2px solid ${t.b}`,background:t.sf,padding:'14px 16px',boxShadow:t.sh}}>
+                <div style={{fontSize:28,fontWeight:900,lineHeight:1}}>{s.v}</div>
+                <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:t.mu,marginTop:4}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:16}}>
+            {[['all','ALL'],...Object.entries(PLATFORMS).map(([k,v])=>[k,v.short])].map(([key,lbl])=>(
+              <button key={key} onClick={()=>setFilterP(key)} style={pb(filterP===key,key!=='all'?PLATFORMS[key]?.color:null)}>
+                {lbl} ({key==='all'?allSongs.length:pCounts[key]||0})
+              </button>
+            ))}
+          </div>
+          <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tracks, artists, albums..." style={{flex:1,minWidth:200,background:t.ib,border:`2px solid ${t.b}`,padding:'10px 14px',color:t.tx,fontSize:12,fontWeight:600,letterSpacing:1,outline:'none',fontFamily:'inherit'}}/>
+            <div style={{display:'flex',border:`2px solid ${t.b}`}}>
+              {[['none','ALL'],['artist','ARTIST'],['album','ALBUM'],['genre','GENRE']].map(([val,lbl],i)=>(
+                <button key={val} onClick={()=>setGroupBy(val)} style={{...pb(groupBy===val),border:'none',borderLeft:i>0?`2px solid ${t.b}`:'none',boxShadow:'none'}}>{lbl}</button>
+              ))}
+            </div>
+          </div>
+          {filtered.length===0
+            ?<div style={{border:`2px solid ${t.b}`,padding:'40px 0',textAlign:'center',color:t.mu,letterSpacing:2,fontSize:12}}>NO RESULTS FOUND</div>
+            :grouped?grouped.map(([grp,gs])=><GroupSection key={grp} title={grp} songs={gs} t={t}/>)
+            :filtered.map((s,i)=><SongRow key={s.id} song={s} t={t} index={i}/>)
+          }
+        </>)}
+
+        {/* ── HISTORY ── */}
+        {view==='history'&&(<>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:24}}>
+            <span style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu}}>RANGE</span>
+            <div style={{display:'flex',border:`2px solid ${t.b}`}}>
+              {[['24h','24H'],['7d','7D'],['30d','30D'],['all','ALL']].map(([val,lbl],i)=>(
+                <button key={val} onClick={()=>setHRange(val)} style={{...pb(hRange===val),border:'none',borderLeft:i>0?`2px solid ${t.b}`:'none',boxShadow:'none'}}>{lbl}</button>
+              ))}
+            </div>
+            <span style={{marginLeft:'auto',fontSize:11,color:t.mu,fontWeight:700,letterSpacing:1}}>{histF.length} PLAYS</span>
+          </div>
+          <div style={{border:`2px solid ${t.b}`,background:t.sf,padding:20,marginBottom:20,boxShadow:t.sh}}>
+            <div style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu,marginBottom:16}}>PLAYS — LAST 7 DAYS</div>
+            <div style={{display:'flex',alignItems:'flex-end',gap:8,height:80}}>
+              {ppd.map(({day,count})=>{
+                const h=count===0?4:Math.max(8,Math.round((count/maxP)*80));
+                const isToday=dayKey(NOW)===day;
+                return(<div key={day} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                  <span style={{fontSize:9,fontWeight:700,color:t.mu}}>{count||''}</span>
+                  <div style={{width:'100%',height:h,background:isToday?t.tx:t.bar,border:`1px solid ${t.b}`}}/>
+                  <span style={{fontSize:9,fontWeight:700,color:isToday?t.tx:t.mu}}>{new Date(day).toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()}</span>
+                </div>);
+              })}
+            </div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
+            <div style={{border:`2px solid ${t.b}`,background:t.sf,padding:16,boxShadow:t.sh}}>
+              <div style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu,marginBottom:14}}>TOP TRACKS</div>
+              {topTracks.map(({song,count},i)=>(
+                <div key={song.id} style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+                  <span style={{fontSize:11,fontWeight:900,color:t.mu,minWidth:16}}>#{i+1}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{song.title}</div>
+                    <div style={{fontSize:10,color:t.mu,marginTop:1}}>{song.artist}</div>
+                  </div>
+                  <span style={{fontSize:11,fontWeight:900,color:t.mu}}>{count}×</span>
+                </div>
+              ))}
+            </div>
+            <div style={{border:`2px solid ${t.b}`,background:t.sf,padding:16,boxShadow:t.sh}}>
+              <div style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu,marginBottom:14}}>BY PLATFORM</div>
+              {Object.entries(PLATFORMS).map(([key,p])=>{
+                const cnt=histF.filter(h=>songMap[h.songId]?.platform===key).length;
+                const pct=histF.length?Math.round((cnt/histF.length)*100):0;
+                return(<div key={key} style={{marginBottom:10}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                    <span style={{fontSize:10,fontWeight:700,letterSpacing:1,color:p.color}}>{p.short}</span>
+                    <span style={{fontSize:10,fontWeight:700,color:t.mu}}>{cnt} ({pct}%)</span>
+                  </div>
+                  <div style={{height:6,background:t.bar,border:`1px solid ${t.b}`}}>
+                    <div style={{height:'100%',width:`${pct}%`,background:p.color,transition:'width .4s'}}/>
+                  </div>
+                </div>);
+              })}
+            </div>
+          </div>
+          <div style={{border:`2px solid ${t.b}`,background:t.sf,boxShadow:t.sh}}>
+            <div style={{borderBottom:`2px solid ${t.b}`,padding:'12px 16px',fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu}}>RECENT PLAYS</div>
+            {histByDay.map(([day,plays])=>(
+              <div key={day}>
+                <div style={{padding:'8px 16px',background:t.ab,borderBottom:`1px solid ${t.b}`,fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu}}>{fmtDate(Number(day)).toUpperCase()} — {plays.length} PLAYS</div>
+                {plays.map(h=>{const s=songMap[h.songId];const p=PLATFORMS[s.platform];return(
+                  <div key={h.id} style={{display:'flex',alignItems:'center',gap:14,padding:'10px 16px',borderBottom:`1px solid ${t.b}`,transition:'background .1s'}}
+                    onMouseEnter={e=>e.currentTarget.style.background=t.ab}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                    <span style={{fontSize:10,color:t.mu,minWidth:52,fontWeight:700}}>{fmtTs(h.ts)}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.title}</div>
+                      <div style={{fontSize:11,color:t.mu,marginTop:1}}>{s.artist}</div>
+                    </div>
+                    <span style={{fontSize:10,fontWeight:900,letterSpacing:1,color:p.color,border:`2px solid ${p.color}`,padding:'2px 6px',flexShrink:0}}>{p.short}</span>
+                    <span style={{fontSize:11,color:t.mu,fontWeight:700}}>{s.duration}</span>
+                  </div>
+                );})}
+              </div>
+            ))}
+          </div>
+        </>)}
+      </div>
+
+      {showConn&&<ConnectModal onClose={()=>setShowConn(false)} t={t} dark={dark} creds={creds} setCreds={setCreds} onOAuth={handleOAuth} onLastfm={handleLastfm}/>}
+    </div>
+  );
+}
+
+function SongRow({song,t,index}){
+  const p=PLATFORMS[song.platform];
+  return(
+    <div style={{display:'flex',alignItems:'center',gap:14,borderBottom:`1px solid ${t.b}`,padding:'12px 4px',transition:'background .1s'}}
+      onMouseEnter={e=>e.currentTarget.style.background=t.ab}
+      onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+      <span style={{color:t.mu,fontSize:11,fontWeight:700,minWidth:28,textAlign:'right'}}>{String(index+1).padStart(2,'0')}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontWeight:700,fontSize:14,letterSpacing:.5,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{song.title}</div>
+        <div style={{color:t.mu,fontSize:11,marginTop:2,letterSpacing:1}}>{song.artist} — {song.album}</div>
+      </div>
+      <span style={{background:'transparent',border:`1px solid ${t.b}`,color:t.mu,fontSize:10,fontWeight:700,letterSpacing:1,padding:'2px 7px',textTransform:'uppercase',flexShrink:0}}>{song.genre}</span>
+      <span style={{fontSize:10,fontWeight:900,letterSpacing:1,color:p.color,border:`2px solid ${p.color}`,padding:'2px 6px',flexShrink:0}}>{p.short}</span>
+      <span style={{color:t.mu,fontSize:12,fontWeight:700,minWidth:36,textAlign:'right'}}>{song.duration}</span>
+    </div>
+  );
+}
+
+function GroupSection({title,songs,t}){
+  const [open,setOpen]=useState(true);
+  return(
+    <div style={{marginBottom:4}}>
+      <div onClick={()=>setOpen(o=>!o)} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 4px',borderBottom:`2px solid ${t.bs}`,cursor:'pointer',userSelect:'none'}}>
+        <span style={{fontWeight:900,fontSize:13,letterSpacing:2,textTransform:'uppercase'}}>{title}</span>
+        <span style={{color:t.mu,fontSize:10,fontWeight:700,marginLeft:'auto',letterSpacing:1}}>{songs.length} TRK</span>
+        <span style={{color:t.mu,fontSize:12}}>{open?'▲':'▼'}</span>
+      </div>
+      {open&&songs.map((s,i)=><SongRow key={s.id} song={s} t={t} index={i}/>)}
+    </div>
+  );
+}
+
+function ConnectModal({onClose,t,dark,creds,setCreds,onOAuth,onLastfm}){
+  const [tab,setTab]         = useState('spotify');
+  const [local,setLocal]     = useState({...creds});
+  const [lfmUser,setLfmUser] = useState(getSaved('mulib_lfmuser','')||'');
+  const [secret,setSecret]   = useState(getSaved('mulib_soundcloud_secret','')||'');
+  const [busy,setBusy]       = useState(false);
+  const [msg,setMsg]         = useState('');
+
+  const ru = redirectUri();
+  const inp={width:'100%',boxSizing:'border-box',background:t.ib,border:`2px solid ${t.b}`,padding:'10px 12px',color:t.tx,fontSize:12,fontFamily:'inherit',outline:'none',marginBottom:8};
+  const lbl={display:'block',fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu,marginBottom:6,marginTop:12};
+
+  function save(platform, val){ const n={...local,[platform]:val}; setLocal(n); setCreds(n); setSaved('mulib_creds',n); }
+
+  async function connect() {
+    const clientId = local[tab];
+    if (!clientId) { setMsg('Enter a Client ID first.'); return; }
+    if (tab === 'soundcloud') { setSaved('mulib_soundcloud_secret', secret); sessionStorage.setItem('mulib_soundcloud_secret', secret); }
+    if (tab === 'lastfm') {
+      if (!lfmUser) { setMsg('Enter your Last.fm username.'); return; }
+      setSaved('mulib_lfmuser', lfmUser);
+      setBusy(true); setMsg('Fetching...');
+      await onLastfm(clientId, lfmUser);
+      setBusy(false); setMsg('');
+      onClose();
+      return;
+    }
+    setBusy(true);
+    await onOAuth(tab, clientId);
+    // page will redirect, no need to setBusy(false)
+  }
+
+  const DOCS = {
+    spotify:    {url:'https://developer.spotify.com/dashboard',    note:'Create app → set Redirect URI → copy Client ID. No secret needed (PKCE).'},
+    youtube:    {url:'https://console.cloud.google.com',           note:'New project → Enable YouTube Data API v3 → Credentials → OAuth 2.0 Client ID (Web). No secret needed (PKCE).'},
+    soundcloud: {url:'https://developers.soundcloud.com',         note:'Register app → set Redirect URI. Requires both Client ID and Client Secret (SoundCloud does not support PKCE).'},
+    tidal:      {url:'https://developer.tidal.com',               note:'Create app → set Redirect URI. No secret needed (PKCE).'},
+    lastfm:     {url:'https://www.last.fm/api/account/create',    note:'Create API account → copy API Key. Enter your Last.fm username. No redirect needed — fetches directly.'},
+  };
+
+  return(
+    <div style={{position:'fixed',inset:0,background:dark?'#000c':'#0006',zIndex:100,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div style={{background:t.sf,border:`3px solid ${t.bs}`,boxShadow:`8px 8px 0 ${t.bs}`,width:'100%',maxWidth:540,maxHeight:'90vh',overflowY:'auto'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:`2px solid ${t.bs}`}}>
+          <span style={{fontWeight:900,letterSpacing:3,fontSize:13,textTransform:'uppercase'}}>CONNECT PLATFORMS</span>
+          <button onClick={onClose} style={{background:'none',border:'none',color:t.mu,fontSize:20,cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+        </div>
+
+        {/* Redirect URI display */}
+        <div style={{padding:'10px 20px',borderBottom:`1px solid ${t.b}`,background:t.ab}}>
+          <span style={{fontSize:10,fontWeight:900,letterSpacing:2,color:t.mu}}>YOUR REDIRECT URI — register this in each platform's developer console:</span>
+          <div style={{marginTop:6,padding:'6px 10px',border:`1px solid ${t.b}`,fontFamily:'monospace',fontSize:11,color:t.tx,wordBreak:'break-all',background:t.ib}}>{ru}</div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:'flex',borderBottom:`2px solid ${t.b}`,overflowX:'auto'}}>
+          {Object.entries(PLATFORMS).map(([key,p])=>(
+            <button key={key} onClick={()=>{setTab(key);setMsg('');}} style={{flex:1,minWidth:50,background:tab===key?t.ab:'transparent',border:'none',borderBottom:tab===key?`3px solid ${p.color}`:'3px solid transparent',color:tab===key?t.tx:t.mu,fontWeight:700,fontSize:9,letterSpacing:.5,padding:'12px 4px',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase'}}>
+              {p.short}
+            </button>
+          ))}
+        </div>
+
+        <div style={{padding:20}}>
+          {/* Docs note */}
+          <div style={{marginBottom:16,padding:'10px 12px',border:`1px solid ${t.b}`,background:t.ab,fontSize:11,color:t.mu,lineHeight:1.7}}>
+            {DOCS[tab].note}
+            <div style={{marginTop:6}}><a href={DOCS[tab].url} target="_blank" rel="noreferrer" style={{color:PLATFORMS[tab].color,fontWeight:700,fontSize:11,letterSpacing:1}}>GET CREDENTIALS →</a></div>
+          </div>
+
+          <label style={lbl}>CLIENT ID {tab==='lastfm'?'(API KEY)':''}</label>
+          <input style={inp} value={local[tab]||''} onChange={e=>save(tab,e.target.value)} placeholder={`${PLATFORMS[tab].name.toUpperCase()} CLIENT ID`}/>
+
+          {tab==='soundcloud'&&(<>
+            <label style={lbl}>CLIENT SECRET</label>
+            <input style={inp} value={secret} onChange={e=>setSecret(e.target.value)} placeholder="SOUNDCLOUD CLIENT SECRET" type="password"/>
+          </>)}
+
+          {tab==='lastfm'&&(<>
+            <label style={lbl}>USERNAME</label>
+            <input style={inp} value={lfmUser} onChange={e=>setLfmUser(e.target.value)} placeholder="YOUR LAST.FM USERNAME"/>
+          </>)}
+
+          <button onClick={connect} disabled={busy} style={{width:'100%',marginTop:8,background:PLATFORMS[tab].color,border:`2px solid ${PLATFORMS[tab].color}`,color:'#fff',fontWeight:900,fontSize:12,letterSpacing:2,padding:'12px 0',cursor:busy?'wait':'pointer',fontFamily:'inherit',opacity:busy?.7:1,boxShadow:`4px 4px 0 ${dark?'#000':'#333'}`}}>
+            {busy?'CONNECTING...':`CONNECT ${PLATFORMS[tab].name.toUpperCase()}`}
+          </button>
+
+          {tab!=='lastfm'&&<p style={{marginTop:10,fontSize:10,color:t.mu,lineHeight:1.7,letterSpacing:.5}}>Clicking Connect will redirect you to {PLATFORMS[tab].name}'s login page. After authorising, you will be sent back to this app and tracks will load automatically.</p>}
+
+          {msg&&<div style={{marginTop:12,padding:'10px 12px',border:`1px solid ${t.b}`,fontSize:12,fontWeight:700,color:'#ef4444'}}>{msg}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
