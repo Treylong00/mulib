@@ -29,6 +29,7 @@ const PLATFORMS = {
   soundcloud: {name:'SoundCloud',    short:'SND', color:'#FF5500'},
   tidal:      {name:'Tidal',         short:'TDL', color:'#00BFFF'},
   lastfm:     {name:'Last.fm',       short:'LFM', color:'#D51007'},
+  scrobble:   {name:'Scrobbles',     short:'SCR', color:'#E8442A'},
 };
 const T = {
   dark:  {bg:'#0a0a0a',sf:'#111',b:'#2a2a2a',bs:'#444',tx:'#f0f0f0',mu:'#666',ab:'#1a1a1a',ib:'#0a0a0a',sh:'4px 4px 0 #333',pa:'#f0f0f0',pat:'#0a0a0a',bar:'#1e1e1e'},
@@ -310,13 +311,28 @@ function App(){
       });
       setLfmRecent(recent);
 
+      // Deduplicate scrobbles → unique library tracks (excluding already-loved)
+      const lovedSet=new Set(loved.map(s=>`${s.title}|||${s.artist}`.toLowerCase()));
+      const countMap={};
+      recent.forEach(s=>{const k=`${s.title}|||${s.artist}`.toLowerCase();countMap[k]=(countMap[k]||0)+1;});
+      const seen=new Set();
+      const scrobbleSongs=[];
+      recent.forEach(s=>{
+        const k=`${s.title}|||${s.artist}`.toLowerCase();
+        if(!seen.has(k)&&!lovedSet.has(k)){
+          seen.add(k);
+          scrobbleSongs.push({id:`scr-${scrobbleSongs.length}`,title:s.title,artist:s.artist,album:s.album||'Unknown',genre:'Unknown',platform:'scrobble',duration:'—',plays:countMap[k]});
+        }
+      });
+      setSongs(prev=>{const f=prev.filter(s=>s.platform!=='scrobble');const n=[...f,...scrobbleSongs];setSaved('mulib_songs',n);return n;});
+
       // Tops (overall to start)
       setLfmProgress('Fetching top tracks, artists & albums...');
       const tops=await fetchLastfmTops(apiKey,username,'overall');
       setLfmTops({'overall':tops});
 
       setLfmFetching(false);setLfmProgress('');
-      setCbStatus({status:'success',msg:`✓ Last.fm connected — ${fmtN(userInfo.playcount)} scrobbles, ${loved.length} loved tracks, ${recent.length} recent plays loaded`});
+      setCbStatus({status:'success',msg:`✓ Last.fm connected — ${fmtN(userInfo.playcount)} total scrobbles · ${loved.length} loved tracks · ${scrobbleSongs.length} unique scrobbled tracks loaded`});
       setView('lastfm');
     }catch(e){
       setLfmFetching(false);setLfmProgress('');
@@ -667,7 +683,7 @@ function SongRow({song,t,index}){
       </div>
       <span style={{border:`1px solid ${t.b}`,color:t.mu,fontSize:10,fontWeight:700,letterSpacing:1,padding:'2px 7px',textTransform:'uppercase',flexShrink:0}}>{song.genre}</span>
       <span style={{fontSize:10,fontWeight:900,letterSpacing:1,color:p.color,border:`2px solid ${p.color}`,padding:'2px 6px',flexShrink:0}}>{p.short}</span>
-      <span style={{color:t.mu,fontSize:12,fontWeight:700,minWidth:36,textAlign:'right'}}>{song.duration}</span>
+      <span style={{color:t.mu,fontSize:12,fontWeight:700,minWidth:36,textAlign:'right'}}>{song.plays?`${song.plays}×`:song.duration}</span>
     </div>
   );
 }
